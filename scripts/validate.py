@@ -6,6 +6,8 @@ import uuid
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+# Pre-existing partner files are preserved byte-for-byte and are outside this style check.
+PARTNER_FILES = {'COMMAND_LOG.md', 'hello_lab.py', 'test_discord.py'}
 sys.path.insert(0, str(ROOT))
 from lab import load, validate_playbook, validate_rule  # noqa: E402
 
@@ -19,6 +21,8 @@ def main():
     count = 0
     for path in ROOT.rglob('*'):
         if any(part in path.parts for part in ('.git', '.venv', '__pycache__', 'secrets', 'artifacts')) or not path.is_file():
+            continue
+        if path.relative_to(ROOT).as_posix() in PARTNER_FILES:
             continue
         if path.suffix in ('.json', '.py', '.md', '.yml'):
             text = path.read_text()
