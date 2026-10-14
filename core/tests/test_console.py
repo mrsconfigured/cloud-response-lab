@@ -194,6 +194,15 @@ class Drift(unittest.TestCase):
         problems = {d.get('problem') for d in deploy.verify(FakeKb(rules))['diffs']}
         self.assertEqual(problems, {'missing in Kibana', 'in Kibana but not in the repo'})
 
+    def test_no_shipped_rule_hardcodes_its_own_lookback(self):
+        import re
+        want = CFG['rule_defaults']['from']
+        self.assertEqual(want, 'now-30m')
+        v1 = json.loads((ROOT / 'v1/generated/elastic-rule.json').read_text())
+        self.assertEqual(v1['from'], want, 'the v1 prototype rule must follow the config value too')
+        self.assertFalse(re.search(r"'from': 'now-", (ROOT / 'v1/build.py').read_text()), 'v1/build.py must not hard-code a lookback')
+        self.assertFalse(re.search(r"'from': 'now-", (ROOT / 'library/build.py').read_text()))
+
     def test_repo_lookback_comes_from_config(self):
         self.assertTrue(all(r['from'] == CFG['rule_defaults']['from'] for r in deploy.desired()))
 

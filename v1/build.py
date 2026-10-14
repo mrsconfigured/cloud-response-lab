@@ -8,6 +8,8 @@ from sigma.backends.elasticsearch import LuceneBackend
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / 'v1/generated'
 RULE_ID = '965a1068-c2bf-4ea5-b1d0-000000000002'
+# lookback and interval come from core/config.json, the single source of truth for every rule
+DEFAULTS = json.loads((ROOT / 'core/config.json').read_text())['rule_defaults']
 INDEX = 'logs-cloud-response-lab-v1'
 
 
@@ -16,8 +18,8 @@ def compile_rule():
     query, = LuceneBackend().convert(rules)
     return {'rule_id': RULE_ID, 'name': rules.rules[0].title,
             'description': rules.rules[0].description, 'type': 'query', 'language': 'lucene',
-            'query': query, 'index': [INDEX], 'enabled': False, 'interval': '1m',
-            'from': 'now-10m', 'to': 'now', 'risk_score': 73, 'severity': 'high',
+            'query': query, 'index': [INDEX], 'enabled': False, 'interval': DEFAULTS['interval'],
+            'from': DEFAULTS['from'], 'to': 'now', 'risk_score': 73, 'severity': 'high',
             'author': ['1xLoZec'], 'tags': ['synthetic', 'attack.t1098.003'],
             'actions': [], 'version': 1}
 

@@ -77,6 +77,14 @@ class Alerts(unittest.TestCase):
         self.assertEqual(pl.lint(channel_view(p)), [])
 
 
+class Verbs(unittest.TestCase):
+    def test_operations_read_as_what_the_account_did(self):
+        self.assertEqual(pl.op_plain('ListAccessKeys'), 'listed access keys')
+        self.assertEqual(pl.op_plain('DescribeInstances'), 'looked up instances')
+        self.assertEqual(pl.op_plain('CreateAccessKey'), 'created an access key')
+        self.assertEqual(pl.op_plain('PutBucketPolicy'), 'set bucket policy')
+
+
 class Acronyms(unittest.TestCase):
     def test_first_use_is_spelled_out_once(self):
         post = {'message': '', 'embed': {'title': 'MFA was reset for a user', 'description': 'MFA again. ATT&CK says so. Also IAM and CI.'}}

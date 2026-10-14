@@ -128,7 +128,12 @@ def op_plain(op):
     if op in OPS:
         return OPS[op]
     if re.fullmatch(r'[A-Z][A-Za-z0-9]+', op):
-        return ' '.join(re.findall(r'[A-Z][a-z0-9]*', op)).lower()
+        words = re.findall(r'[A-Z][a-z0-9]*', op)
+        verb = {'List': 'listed', 'Get': 'looked up', 'Describe': 'looked up', 'Create': 'created', 'Delete': 'deleted', 'Put': 'set', 'Update': 'changed',
+                'Attach': 'attached', 'Detach': 'detached', 'Add': 'added', 'Remove': 'removed', 'Assume': 'took on', 'Stop': 'stopped', 'Start': 'started',
+                'Enable': 'enabled', 'Disable': 'disabled', 'Tag': 'tagged', 'Untag': 'untagged', 'Generate': 'generated'}.get(words[0])
+        rest = ' '.join(words[1:]).lower()
+        return ('%s %s' % (verb, rest)).strip() if verb else ' '.join(words).lower()
     return op.lower()
 
 
