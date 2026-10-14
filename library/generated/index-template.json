@@ -1,0 +1,45 @@
+{
+  "index_patterns": [
+    "logs-cloud-response-lab-library-*"
+  ],
+  "priority": 502,
+  "template": {
+    "mappings": {
+      "properties": {
+        "eventSource": {
+          "type": "keyword"
+        },
+        "eventName": {
+          "type": "keyword"
+        },
+        "requestParameters.policyArn": {
+          "type": "keyword"
+        },
+        "responseElements.ConsoleLogin": {
+          "type": "keyword"
+        },
+        "additionalEventData.MFAUsed": {
+          "type": "keyword"
+        },
+        "category": {
+          "type": "keyword"
+        },
+        "activityDisplayName": {
+          "type": "keyword"
+        },
+        "loggedByService": {
+          "type": "keyword"
+        },
+        "result": {
+          "type": "keyword"
+        },
+        "errorCode": {
+          "type": "keyword"
+        },
+        "@timestamp": {
+          "type": "date"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,98 @@
+{
+  "scope": "offline compiler and actual response policy only; no Elasticsearch/Shuffle engine claim",
+  "compiled_query": "(eventSource:iam.amazonaws.com AND (eventName:(AttachUserPolicy OR AttachRolePolicy OR AttachGroupPolicy)) AND requestParameters.policyArn:arn\\:aws\\:iam\\:\\:aws\\:policy\\/AdministratorAccess) AND (NOT _exists_:errorCode)",
+  "results": [
+    {
+      "case": "attack-user",
+      "first": {
+        "status": "human_review_required",
+        "mode": "dry_run",
+        "key": "494ed2fb1bc9f20fb8d2ec514de8c4b3e1409eef871ad06bbb2d7619736ec17d",
+        "rule_id": "965a1068-c2bf-4ea5-b1d0-000000000002",
+        "event_id": "ce8e966b-e130-5a8b-baf9-4cc99e3a14a2",
+        "owner": "mrsconfigured",
+        "actions": [],
+        "proposal": {
+          "operation": "DetachUserPolicy",
+          "userName": "lab-target",
+          "policyArn": "arn:aws:iam::aws:policy/AdministratorAccess"
+        },
+        "summary": "Verify original event and authorized change. Proposal ONLY; never executed."
+      },
+      "replay": {
+        "status": "duplicate",
+        "key": "494ed2fb1bc9f20fb8d2ec514de8c4b3e1409eef871ad06bbb2d7619736ec17d",
+        "mode": "dry_run",
+        "actions": []
+      }
+    },
+    {
+      "case": "attack-role",
+      "first": {
+        "status": "human_review_required",
+        "mode": "dry_run",
+        "key": "3de9cefe814674d5f4719a9e846f2f5a6dad7fc4bb5da99d84100dddd39e3d39",
+        "rule_id": "965a1068-c2bf-4ea5-b1d0-000000000002",
+        "event_id": "c4784017-7af5-5d89-86ed-48b693ce71d2",
+        "owner": "mrsconfigured",
+        "actions": [],
+        "proposal": {
+          "operation": "DetachRolePolicy",
+          "roleName": "lab-role",
+          "policyArn": "arn:aws:iam::aws:policy/AdministratorAccess"
+        },
+        "summary": "Verify original event and authorized change. Proposal ONLY; never executed."
+      },
+      "replay": {
+        "status": "duplicate",
+        "key": "3de9cefe814674d5f4719a9e846f2f5a6dad7fc4bb5da99d84100dddd39e3d39",
+        "mode": "dry_run",
+        "actions": []
+      }
+    },
+    {
+      "case": "attack-group",
+      "first": {
+        "status": "human_review_required",
+        "mode": "dry_run",
+        "key": "2758c7202e42071f0737d711b3f5a18a3679771d60b43c12802abc02a8810cef",
+        "rule_id": "965a1068-c2bf-4ea5-b1d0-000000000002",
+        "event_id": "294cf733-9cb7-5932-b0ca-bb34b60340d9",
+        "owner": "mrsconfigured",
+        "actions": [],
+        "proposal": {
+          "operation": "DetachGroupPolicy",
+          "groupName": "lab-group",
+          "policyArn": "arn:aws:iam::aws:policy/AdministratorAccess"
+        },
+        "summary": "Verify original event and authorized change. Proposal ONLY; never executed."
+      },
+      "replay": {
+        "status": "duplicate",
+        "key": "2758c7202e42071f0737d711b3f5a18a3679771d60b43c12802abc02a8810cef",
+        "mode": "dry_run",
+        "actions": []
+      }
+    },
+    {
+      "case": "benign-readonly",
+      "status": "rejected"
+    },
+    {
+      "case": "denied-admin",
+      "status": "rejected"
+    },
+    {
+      "case": "benign-list",
+      "status": "rejected"
+    },
+    {
+      "case": "wrong-service",
+      "status": "rejected"
+    },
+    {
+      "case": "case-sensitive",
+      "status": "rejected"
+    }
+  ]
+}

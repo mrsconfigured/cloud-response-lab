@@ -1,0 +1,22 @@
+title: AWS CloudTrail Trail Deleted
+id: 8a7d441b-870b-4fce-bac4-000000000002
+status: experimental
+description: Successful aws cloudtrail trail deleted; behavioral signal, not proof of malicious intent. Raw provider field contract; synthetic tests only.
+author: 1xLoZec
+date: 2026-10-14
+tags:
+  - attack.defense-evasion
+  - attack.t1562.008
+logsource:
+  product: aws
+  service: cloudtrail
+detection:
+  selection:
+    eventSource: "cloudtrail.amazonaws.com"
+    eventName: "DeleteTrail"
+  success:
+    errorCode: null
+  condition: selection and success
+falsepositives:
+  - Authorized administration or legitimate activity; require actor and change-ticket review.
+level: high

@@ -1,0 +1,8 @@
+{
+  "openapi": "3.0.3",
+  "info": {"title": "Cloud Response Lab", "version": "1.0.0", "description": "Synthetic validation, persistent dedup and dry-run review proposal. No cloud actions."},
+  "servers": [{"url": "https://response:8443"}],
+  "security": [{"bearerAuth": []}],
+  "components": {"securitySchemes": {"bearerAuth": {"type": "http", "scheme": "bearer"}}},
+  "paths": {"/respond": {"post": {"operationId": "triage_synthetic_alert", "summary": "Validate and deduplicate synthetic alert", "requestBody": {"required": true, "content": {"application/json": {"schema": {"type": "object", "required": ["rule_id", "synthetic", "event"], "properties": {"rule_id": {"type": "string"}, "synthetic": {"type": "boolean"}, "event": {"type": "object"}}}}}}, "responses": {"200": {"description": "Dry-run proposal or duplicate"}, "400": {"description": "Invalid or out of scope"}, "401": {"description": "Authentication required"}}}}}
+}

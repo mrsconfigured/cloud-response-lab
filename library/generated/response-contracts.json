@@ -1,0 +1,82 @@
+[
+  {
+    "id": "aws-access-key-create",
+    "rule_id": "8a7d441b-870b-4fce-bac4-000000000003",
+    "provider": "aws",
+    "scope": "111111111111",
+    "max_age_seconds": 600,
+    "mode": "dry_run",
+    "automatic_actions": [],
+    "review_prompt": "Verify actor, target, authorization and evidence; do not remediate automatically."
+  },
+  {
+    "id": "aws-admin-attachment",
+    "rule_id": "965a1068-c2bf-4ea5-b1d0-000000000002",
+    "provider": "aws",
+    "scope": "111111111111",
+    "max_age_seconds": 600,
+    "mode": "dry_run",
+    "automatic_actions": [],
+    "review_prompt": "Verify actor, target, authorization and evidence; do not remediate automatically."
+  },
+  {
+    "id": "aws-cloudtrail-delete",
+    "rule_id": "8a7d441b-870b-4fce-bac4-000000000002",
+    "provider": "aws",
+    "scope": "111111111111",
+    "max_age_seconds": 600,
+    "mode": "dry_run",
+    "automatic_actions": [],
+    "review_prompt": "Verify actor, target, authorization and evidence; do not remediate automatically."
+  },
+  {
+    "id": "aws-cloudtrail-stop",
+    "rule_id": "8a7d441b-870b-4fce-bac4-000000000001",
+    "provider": "aws",
+    "scope": "111111111111",
+    "max_age_seconds": 600,
+    "mode": "dry_run",
+    "automatic_actions": [],
+    "review_prompt": "Verify actor, target, authorization and evidence; do not remediate automatically."
+  },
+  {
+    "id": "aws-console-no-mfa",
+    "rule_id": "8a7d441b-870b-4fce-bac4-000000000004",
+    "provider": "aws",
+    "scope": "111111111111",
+    "max_age_seconds": 600,
+    "mode": "dry_run",
+    "automatic_actions": [],
+    "review_prompt": "Verify actor, target, authorization and evidence; do not remediate automatically."
+  },
+  {
+    "id": "entra-app-credential",
+    "rule_id": "8a7d441b-870b-4fce-bac4-000000000006",
+    "provider": "entra",
+    "scope": "00000000-0000-4000-8000-000000000001",
+    "max_age_seconds": 600,
+    "mode": "dry_run",
+    "automatic_actions": [],
+    "review_prompt": "Verify actor, target, authorization and evidence; do not remediate automatically."
+  },
+  {
+    "id": "entra-conditional-access-delete",
+    "rule_id": "8a7d441b-870b-4fce-bac4-000000000007",
+    "provider": "entra",
+    "scope": "00000000-0000-4000-8000-000000000001",
+    "max_age_seconds": 600,
+    "mode": "dry_run",
+    "automatic_actions": [],
+    "review_prompt": "Verify actor, target, authorization and evidence; do not remediate automatically."
+  },
+  {
+    "id": "entra-role-member",
+    "rule_id": "8a7d441b-870b-4fce-bac4-000000000005",
+    "provider": "entra",
+    "scope": "00000000-0000-4000-8000-000000000001",
+    "max_age_seconds": 600,
+    "mode": "dry_run",
+    "automatic_actions": [],
+    "review_prompt": "Verify actor, target, authorization and evidence; do not remediate automatically."
+  }
+]

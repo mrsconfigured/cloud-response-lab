@@ -1,0 +1,34 @@
+name: Offline lab CI
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  offline-validation:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2, verified upstream
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0, verified upstream
+        with:
+          python-version: '3.12'
+      - name: Install pinned v1 compiler
+        run: python -m pip install -r requirements-v1.lock
+      - name: Compile genuine Sigma
+        run: python -m v1.build && git diff --exit-code -- v1/generated v1/kibana
+      - name: Compile library and verify deterministic matrix and ATT&CK layer
+        run: python -m library.build && git diff --exit-code -- library/generated
+      - name: Structural lint and playbook validation
+        run: python scripts/validate.py
+      - name: Per-rule acceptance and response safety tests
+        run: python -m unittest discover -s tests -v
+      - name: Optimized safety regression
+        run: python -O -m unittest discover -s tests -v
+      - name: Detection fixture report
+        run: python lab.py
+      - name: Patch whitespace check
+        run: git diff --check

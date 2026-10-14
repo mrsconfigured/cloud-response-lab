@@ -1,0 +1,26 @@
+title: Synthetic AWS IAM AdministratorAccess Policy Attachment
+id: 965a1068-c2bf-4ea5-b1d0-000000000002
+status: experimental
+description: Successful attachment of AWS managed AdministratorAccess to an IAM user, group or role. Synthetic lab only.
+author: 1xLoZec
+date: 2026-10-13
+tags:
+  - attack.privilege-escalation
+  - attack.t1098.003
+logsource:
+  product: aws
+  service: cloudtrail
+detection:
+  selection:
+    eventSource: iam.amazonaws.com
+    eventName:
+      - AttachUserPolicy
+      - AttachRolePolicy
+      - AttachGroupPolicy
+    requestParameters.policyArn: arn:aws:iam::aws:policy/AdministratorAccess
+  success:
+    errorCode: null
+  condition: selection and success
+falsepositives:
+  - Authorized administrator provisioning; verify change authorization.
+level: high

@@ -1,0 +1,26 @@
+{
+  "rule_id": "965a1068-c2bf-4ea5-b1d0-000000000002",
+  "name": "Synthetic AWS IAM AdministratorAccess Policy Attachment",
+  "description": "Successful attachment of AWS managed AdministratorAccess to an IAM user, group or role. Synthetic lab only.",
+  "type": "query",
+  "language": "lucene",
+  "query": "(eventSource:iam.amazonaws.com AND (eventName:(AttachUserPolicy OR AttachRolePolicy OR AttachGroupPolicy)) AND requestParameters.policyArn:arn\\:aws\\:iam\\:\\:aws\\:policy\\/AdministratorAccess) AND (NOT _exists_:errorCode)",
+  "index": [
+    "logs-cloud-response-lab-v1"
+  ],
+  "enabled": false,
+  "interval": "1m",
+  "from": "now-10m",
+  "to": "now",
+  "risk_score": 73,
+  "severity": "high",
+  "author": [
+    "1xLoZec"
+  ],
+  "tags": [
+    "synthetic",
+    "attack.t1098.003"
+  ],
+  "actions": [],
+  "version": 1
+}

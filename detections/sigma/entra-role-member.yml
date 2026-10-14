@@ -1,0 +1,22 @@
+title: Entra Directory Role Member Added
+id: 8a7d441b-870b-4fce-bac4-000000000005
+status: experimental
+description: Successful entra directory role member added; behavioral signal, not proof of malicious intent. Raw provider field contract; synthetic tests only.
+author: 1xLoZec
+date: 2026-10-14
+tags:
+  - attack.privilege-escalation
+  - attack.t1098.003
+logsource:
+  product: azure
+  service: auditlogs
+detection:
+  selection:
+    category: "RoleManagement"
+    activityDisplayName: "Add member to role"
+    loggedByService: "Core Directory"
+    result: "success"
+  condition: selection
+falsepositives:
+  - Authorized administration or legitimate activity; require actor and change-ticket review.
+level: high

@@ -1,0 +1,113 @@
+{
+  "synthetic": true,
+  "provider": "entra",
+  "cases": [
+    {
+      "name": "successful-sensitive-operation",
+      "match": true,
+      "event": {
+        "id": "00000000-0000-4000-8000-000000000003",
+        "activityDateTime": "2026-10-13T18:00:00Z",
+        "correlationId": "00000000-0000-4000-8000-000000000004",
+        "category": "RoleManagement",
+        "activityDisplayName": "Add member to role",
+        "result": "success",
+        "loggedByService": "Core Directory",
+        "initiatedBy": {
+          "user": {
+            "id": "00000000-0000-4000-8000-000000000005",
+            "userPrincipalName": "owner_a@example.invalid",
+            "ipAddress": "192.0.2.50"
+          }
+        },
+        "targetResources": [
+          {
+            "id": "00000000-0000-4000-8000-000000000006",
+            "type": "User",
+            "userPrincipalName": "owner_b@example.invalid",
+            "modifiedProperties": [
+              {
+                "displayName": "Role.DisplayName",
+                "oldValue": null,
+                "newValue": "\"Global Administrator\""
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "benign-other-operation",
+      "match": false,
+      "event": {
+        "id": "00000000-0000-4000-8000-000000000003",
+        "activityDateTime": "2026-10-13T18:00:00Z",
+        "correlationId": "00000000-0000-4000-8000-000000000004",
+        "category": "RoleManagement",
+        "activityDisplayName": "Update user",
+        "result": "success",
+        "loggedByService": "Core Directory",
+        "initiatedBy": {
+          "user": {
+            "id": "00000000-0000-4000-8000-000000000005",
+            "userPrincipalName": "owner_a@example.invalid",
+            "ipAddress": "192.0.2.50"
+          }
+        },
+        "targetResources": [
+          {
+            "id": "00000000-0000-4000-8000-000000000006",
+            "type": "User",
+            "userPrincipalName": "owner_b@example.invalid",
+            "modifiedProperties": [
+              {
+                "displayName": "Role.DisplayName",
+                "oldValue": null,
+                "newValue": "\"Global Administrator\""
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "failed-operation",
+      "match": false,
+      "event": {
+        "id": "00000000-0000-4000-8000-000000000003",
+        "activityDateTime": "2026-10-13T18:00:00Z",
+        "correlationId": "00000000-0000-4000-8000-000000000004",
+        "category": "RoleManagement",
+        "activityDisplayName": "Add member to role",
+        "result": "failure",
+        "loggedByService": "Core Directory",
+        "initiatedBy": {
+          "user": {
+            "id": "00000000-0000-4000-8000-000000000005",
+            "userPrincipalName": "owner_a@example.invalid",
+            "ipAddress": "192.0.2.50"
+          }
+        },
+        "targetResources": [
+          {
+            "id": "00000000-0000-4000-8000-000000000006",
+            "type": "User",
+            "userPrincipalName": "owner_b@example.invalid",
+            "modifiedProperties": [
+              {
+                "displayName": "Role.DisplayName",
+                "oldValue": null,
+                "newValue": "\"Global Administrator\""
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "missing-required-fields",
+      "match": false,
+      "event": {}
+    }
+  ]
+}

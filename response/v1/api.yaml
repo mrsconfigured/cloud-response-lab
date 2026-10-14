@@ -1,0 +1,30 @@
+name: Cloud Response Lab
+app_version: 1.0.0
+description: Synthetic-only validation, persistent dedup and human-review proposal. No AWS client.
+contact_info:
+  name: Owner B (mrsconfigured)
+authentication:
+  required: true
+  parameters:
+    - name: api_token
+      description: Private response API token
+      required: true
+      schema:
+        type: string
+    - name: ca_pem
+      description: Private lab CA PEM for verified TLS
+      required: true
+      schema:
+        type: string
+actions:
+  - name: triage_synthetic_alert
+    description: Validate CloudTrail event and return dry-run review proposal or duplicate
+    parameters:
+      - name: alert
+        required: true
+        multiline: true
+        schema:
+          type: string
+    returns:
+      schema:
+        type: object

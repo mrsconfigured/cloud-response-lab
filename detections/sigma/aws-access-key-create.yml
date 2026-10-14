@@ -1,0 +1,22 @@
+title: AWS IAM Access Key Created
+id: 8a7d441b-870b-4fce-bac4-000000000003
+status: experimental
+description: Successful aws iam access key created; behavioral signal, not proof of malicious intent. Raw provider field contract; synthetic tests only.
+author: 1xLoZec
+date: 2026-10-14
+tags:
+  - attack.persistence
+  - attack.t1098.001
+logsource:
+  product: aws
+  service: cloudtrail
+detection:
+  selection:
+    eventSource: "iam.amazonaws.com"
+    eventName: "CreateAccessKey"
+  success:
+    errorCode: null
+  condition: selection and success
+falsepositives:
+  - Authorized administration or legitimate activity; require actor and change-ticket review.
+level: high

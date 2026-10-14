@@ -1,0 +1,26 @@
+{
+  "status": "staged-not-applied",
+  "target": {
+    "repository": "REPLACE_PERSONAL_REPOSITORY",
+    "branch": "main"
+  },
+  "requiredChecks": [
+    "offline-validation",
+    "cross-owner-review"
+  ],
+  "policy": {
+    "pullRequestRequired": true,
+    "minimumApprovals": 1,
+    "codeOwnerReview": true,
+    "dismissStaleReviews": true,
+    "latestPushApproval": true,
+    "resolvedConversations": true,
+    "forcePushes": false,
+    "deletions": false,
+    "adminBypass": false
+  },
+  "warnings": [
+    "GitHub plan and ruleset enforcement must be verified in disposable repo",
+    "Trusted cross-owner check issuer is not implemented or registered"
+  ]
+}

@@ -1,0 +1,106 @@
+[
+  {
+    "slug": "aws-access-key-create",
+    "id": "8a7d441b-870b-4fce-bac4-000000000003",
+    "provider": "aws",
+    "logsource": {
+      "product": "aws",
+      "service": "cloudtrail"
+    },
+    "technique": "T1098.001",
+    "positive": 1,
+    "negative": 7,
+    "query_engine_live": false
+  },
+  {
+    "slug": "aws-admin-attachment",
+    "id": "965a1068-c2bf-4ea5-b1d0-000000000002",
+    "provider": "aws",
+    "logsource": {
+      "product": "aws",
+      "service": "cloudtrail"
+    },
+    "technique": "T1098.003",
+    "positive": 3,
+    "negative": 9,
+    "query_engine_live": false
+  },
+  {
+    "slug": "aws-cloudtrail-delete",
+    "id": "8a7d441b-870b-4fce-bac4-000000000002",
+    "provider": "aws",
+    "logsource": {
+      "product": "aws",
+      "service": "cloudtrail"
+    },
+    "technique": "T1562.008",
+    "positive": 1,
+    "negative": 7,
+    "query_engine_live": false
+  },
+  {
+    "slug": "aws-cloudtrail-stop",
+    "id": "8a7d441b-870b-4fce-bac4-000000000001",
+    "provider": "aws",
+    "logsource": {
+      "product": "aws",
+      "service": "cloudtrail"
+    },
+    "technique": "T1562.008",
+    "positive": 1,
+    "negative": 7,
+    "query_engine_live": false
+  },
+  {
+    "slug": "aws-console-no-mfa",
+    "id": "8a7d441b-870b-4fce-bac4-000000000004",
+    "provider": "aws",
+    "logsource": {
+      "product": "aws",
+      "service": "cloudtrail"
+    },
+    "technique": "T1078.004",
+    "positive": 1,
+    "negative": 11,
+    "query_engine_live": false
+  },
+  {
+    "slug": "entra-app-credential",
+    "id": "8a7d441b-870b-4fce-bac4-000000000006",
+    "provider": "entra",
+    "logsource": {
+      "product": "azure",
+      "service": "auditlogs"
+    },
+    "technique": "T1098.001",
+    "positive": 1,
+    "negative": 10,
+    "query_engine_live": false
+  },
+  {
+    "slug": "entra-conditional-access-delete",
+    "id": "8a7d441b-870b-4fce-bac4-000000000007",
+    "provider": "entra",
+    "logsource": {
+      "product": "azure",
+      "service": "auditlogs"
+    },
+    "technique": "T1556.009",
+    "positive": 1,
+    "negative": 10,
+    "query_engine_live": false
+  },
+  {
+    "slug": "entra-role-member",
+    "id": "8a7d441b-870b-4fce-bac4-000000000005",
+    "provider": "entra",
+    "logsource": {
+      "product": "azure",
+      "service": "auditlogs"
+    },
+    "technique": "T1098.003",
+    "positive": 1,
+    "negative": 10,
+    "query_engine_live": false
+  }
+]

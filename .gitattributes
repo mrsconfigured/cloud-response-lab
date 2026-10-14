@@ -1,0 +1,2 @@
+# Preserve byte-identical vendored schema evidence; hashes are verified in tests.
+docs/upstream/*.yaml -whitespace

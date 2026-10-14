@@ -1,0 +1,50 @@
+{
+  "index_patterns": [
+    "logs-cloud-response-lab-v1"
+  ],
+  "priority": 501,
+  "template": {
+    "mappings": {
+      "properties": {
+        "eventSource": {
+          "type": "keyword"
+        },
+        "eventName": {
+          "type": "keyword"
+        },
+        "eventID": {
+          "type": "keyword"
+        },
+        "errorCode": {
+          "type": "keyword"
+        },
+        "recipientAccountId": {
+          "type": "keyword"
+        },
+        "@timestamp": {
+          "type": "date"
+        },
+        "eventTime": {
+          "type": "date"
+        },
+        "requestParameters": {
+          "properties": {
+            "policyArn": {
+              "type": "keyword"
+            }
+          }
+        },
+        "lab": {
+          "properties": {
+            "synthetic": {
+              "type": "boolean"
+            },
+            "case": {
+              "type": "keyword"
+            }
+          }
+        }
+      }
+    }
+  }
+}

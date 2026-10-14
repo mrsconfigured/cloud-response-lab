@@ -1,0 +1,43 @@
+{
+  "index_patterns": [
+    "logs-personal-lab-*"
+  ],
+  "template": {
+    "mappings": {
+      "dynamic": "strict",
+      "properties": {
+        "@timestamp": {
+          "type": "date"
+        },
+        "lab": {
+          "properties": {
+            "provider": {
+              "type": "keyword"
+            },
+            "event_source": {
+              "type": "keyword"
+            },
+            "event_name": {
+              "type": "keyword"
+            },
+            "policy_arn": {
+              "type": "keyword"
+            },
+            "category": {
+              "type": "keyword"
+            },
+            "activity": {
+              "type": "keyword"
+            },
+            "result": {
+              "type": "keyword"
+            },
+            "error_code": {
+              "type": "keyword"
+            }
+          }
+        }
+      }
+    }
+  }
+}

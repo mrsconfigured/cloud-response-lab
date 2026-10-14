@@ -1,0 +1,145 @@
+{
+  "synthetic": true,
+  "provider": "aws",
+  "cases": [
+    {
+      "name": "successful-sensitive-operation",
+      "match": true,
+      "event": {
+        "eventVersion": "1.09",
+        "eventTime": "2026-10-13T18:00:00Z",
+        "eventSource": "iam.amazonaws.com",
+        "eventName": "AttachUserPolicy",
+        "awsRegion": "us-east-1",
+        "sourceIPAddress": "192.0.2.40",
+        "userAgent": "synthetic-lab/1.0",
+        "eventID": "00000000-0000-4000-8000-000000000002",
+        "eventType": "AwsApiCall",
+        "managementEvent": true,
+        "readOnly": false,
+        "recipientAccountId": "111111111111",
+        "userIdentity": {
+          "type": "AssumedRole",
+          "accountId": "111111111111",
+          "arn": "arn:aws:sts::111111111111:assumed-role/lab-operator/owner_a",
+          "sessionContext": {
+            "attributes": {
+              "mfaAuthenticated": "true"
+            }
+          }
+        },
+        "requestParameters": {
+          "userName": "synthetic-lab-user",
+          "policyArn": "arn:aws:iam::aws:policy/AdministratorAccess"
+        },
+        "responseElements": null
+      }
+    },
+    {
+      "name": "benign-other-operation",
+      "match": false,
+      "event": {
+        "eventVersion": "1.09",
+        "eventTime": "2026-10-13T18:00:00Z",
+        "eventSource": "iam.amazonaws.com",
+        "eventName": "GetCallerIdentity",
+        "awsRegion": "us-east-1",
+        "sourceIPAddress": "192.0.2.40",
+        "userAgent": "synthetic-lab/1.0",
+        "eventID": "00000000-0000-4000-8000-000000000002",
+        "eventType": "AwsApiCall",
+        "managementEvent": true,
+        "readOnly": false,
+        "recipientAccountId": "111111111111",
+        "userIdentity": {
+          "type": "AssumedRole",
+          "accountId": "111111111111",
+          "arn": "arn:aws:sts::111111111111:assumed-role/lab-operator/owner_a",
+          "sessionContext": {
+            "attributes": {
+              "mfaAuthenticated": "true"
+            }
+          }
+        },
+        "requestParameters": {
+          "userName": "synthetic-lab-user",
+          "policyArn": "arn:aws:iam::aws:policy/AdministratorAccess"
+        },
+        "responseElements": null
+      }
+    },
+    {
+      "name": "failed-operation",
+      "match": false,
+      "event": {
+        "eventVersion": "1.09",
+        "eventTime": "2026-10-13T18:00:00Z",
+        "eventSource": "iam.amazonaws.com",
+        "eventName": "AttachUserPolicy",
+        "awsRegion": "us-east-1",
+        "sourceIPAddress": "192.0.2.40",
+        "userAgent": "synthetic-lab/1.0",
+        "eventID": "00000000-0000-4000-8000-000000000002",
+        "eventType": "AwsApiCall",
+        "managementEvent": true,
+        "readOnly": false,
+        "recipientAccountId": "111111111111",
+        "userIdentity": {
+          "type": "AssumedRole",
+          "accountId": "111111111111",
+          "arn": "arn:aws:sts::111111111111:assumed-role/lab-operator/owner_a",
+          "sessionContext": {
+            "attributes": {
+              "mfaAuthenticated": "true"
+            }
+          }
+        },
+        "requestParameters": {
+          "userName": "synthetic-lab-user",
+          "policyArn": "arn:aws:iam::aws:policy/AdministratorAccess"
+        },
+        "responseElements": null,
+        "errorCode": "AccessDenied",
+        "errorMessage": "Synthetic policy denies request"
+      }
+    },
+    {
+      "name": "missing-required-fields",
+      "match": false,
+      "event": {}
+    },
+    {
+      "name": "readonly-policy",
+      "match": false,
+      "event": {
+        "eventVersion": "1.09",
+        "eventTime": "2026-10-13T18:00:00Z",
+        "eventSource": "iam.amazonaws.com",
+        "eventName": "AttachUserPolicy",
+        "awsRegion": "us-east-1",
+        "sourceIPAddress": "192.0.2.40",
+        "userAgent": "synthetic-lab/1.0",
+        "eventID": "00000000-0000-4000-8000-000000000002",
+        "eventType": "AwsApiCall",
+        "managementEvent": true,
+        "readOnly": false,
+        "recipientAccountId": "111111111111",
+        "userIdentity": {
+          "type": "AssumedRole",
+          "accountId": "111111111111",
+          "arn": "arn:aws:sts::111111111111:assumed-role/lab-operator/owner_a",
+          "sessionContext": {
+            "attributes": {
+              "mfaAuthenticated": "true"
+            }
+          }
+        },
+        "requestParameters": {
+          "userName": "synthetic-lab-user",
+          "policyArn": "arn:aws:iam::aws:policy/ReadOnlyAccess"
+        },
+        "responseElements": null
+      }
+    }
+  ]
+}

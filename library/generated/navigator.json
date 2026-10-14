@@ -1,0 +1,41 @@
+{
+  "name": "Synthetic cloud lab \u2014 offline coverage, not efficacy",
+  "domain": "enterprise-attack",
+  "versions": {
+    "layer": "4.5",
+    "navigator": "5.1.0"
+  },
+  "description": "Technique mappings are behavioral hypotheses. Scores count rules, not coverage percentage; new rules lack live query proof.",
+  "techniques": [
+    {
+      "techniqueID": "T1078.004",
+      "score": 1,
+      "enabled": true,
+      "comment": "Offline pySigma AST replay only: aws-console-no-mfa"
+    },
+    {
+      "techniqueID": "T1098.001",
+      "score": 2,
+      "enabled": true,
+      "comment": "Offline pySigma AST replay only: aws-access-key-create, entra-app-credential"
+    },
+    {
+      "techniqueID": "T1098.003",
+      "score": 2,
+      "enabled": true,
+      "comment": "Offline pySigma AST replay only: aws-admin-attachment, entra-role-member"
+    },
+    {
+      "techniqueID": "T1556.009",
+      "score": 1,
+      "enabled": true,
+      "comment": "Offline pySigma AST replay only: entra-conditional-access-delete"
+    },
+    {
+      "techniqueID": "T1562.008",
+      "score": 2,
+      "enabled": true,
+      "comment": "Offline pySigma AST replay only: aws-cloudtrail-delete, aws-cloudtrail-stop"
+    }
+  ]
+}

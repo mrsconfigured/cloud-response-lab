@@ -1,0 +1,7 @@
+# Ownership is not enforcement: require protected PRs and actual other-owner approval.
+* @1xLoZec @mrsconfigured
+/detections/ @1xLoZec
+/response/ @mrsconfigured
+/v1/ @1xLoZec @mrsconfigured
+/.github/ @1xLoZec @mrsconfigured
+/infra/ @1xLoZec @mrsconfigured

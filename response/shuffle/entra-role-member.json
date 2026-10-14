@@ -1,0 +1,88 @@
+{
+  "id": "1e2af7ba-6db4-5538-9688-82ed47e72c93",
+  "name": "STAGED Owner A + Owner B: entra-role-member",
+  "description": "Upstream-native field layout; app binding/import/execution unverified. Static human-review instructions ONLY; does not implement validation or deduplication.",
+  "is_valid": false,
+  "public": false,
+  "owner": "",
+  "start": "f4ff5360-6c55-5489-89ef-055f811dafd5",
+  "actions": [
+    {
+      "id": "f4ff5360-6c55-5489-89ef-055f811dafd5",
+      "app_name": "Shuffle Tools",
+      "app_version": "1.2.0",
+      "app_id": "",
+      "name": "repeat_back_to_me",
+      "label": "staged_notice",
+      "description": "Static no-op, not live alert triage",
+      "is_valid": false,
+      "isStartNode": true,
+      "authentication_id": "",
+      "environment": "Shuffle",
+      "public": false,
+      "position": {
+        "x": 100,
+        "y": 100
+      },
+      "parameters": [
+        {
+          "name": "call",
+          "variant": "STATIC_VALUE",
+          "value": "{\"mode\": \"dry_run\", \"status\": \"human_review_required\", \"rule_id\": \"965a1068-c2bf-4ea5-b1d0-000000000003\", \"owner\": \"Owner B\", \"actions\": [], \"summary\": \"Verify personal tenant, role target and change authorization. Never revoke sessions or remove roles automatically.\"}",
+          "required": true,
+          "configuration": false
+        }
+      ]
+    },
+    {
+      "id": "69e0c3ce-52ca-5f65-8550-237ebf405f5d",
+      "app_name": "Shuffle Tools",
+      "app_version": "1.2.0",
+      "app_id": "",
+      "name": "repeat_back_to_me",
+      "label": "human_review_required",
+      "description": "Static no-op, not live alert triage",
+      "is_valid": false,
+      "isStartNode": false,
+      "authentication_id": "",
+      "environment": "Shuffle",
+      "public": false,
+      "position": {
+        "x": 400,
+        "y": 100
+      },
+      "parameters": [
+        {
+          "name": "call",
+          "variant": "STATIC_VALUE",
+          "value": "{\"mode\": \"dry_run\", \"status\": \"human_review_required\", \"rule_id\": \"965a1068-c2bf-4ea5-b1d0-000000000003\", \"owner\": \"Owner B\", \"actions\": [], \"summary\": \"Verify personal tenant, role target and change authorization. Never revoke sessions or remove roles automatically.\"}",
+          "required": true,
+          "configuration": false
+        }
+      ]
+    }
+  ],
+  "branches": [
+    {
+      "id": "b91606ac-ce75-5f45-950a-9b2db232b86f",
+      "source_id": "f4ff5360-6c55-5489-89ef-055f811dafd5",
+      "destination_id": "69e0c3ce-52ca-5f65-8550-237ebf405f5d",
+      "label": "manual review only",
+      "conditions": []
+    }
+  ],
+  "triggers": [],
+  "workflow_variables": [],
+  "execution_variables": [],
+  "configuration": {
+    "exit_on_error": true,
+    "start_from_top": true,
+    "skip_notifications": true
+  },
+  "tags": [
+    "experimental",
+    "dry-run",
+    "Owner B"
+  ],
+  "example_argument": "{}"
+}

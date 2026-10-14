@@ -1,0 +1,7 @@
+# STOP: replace both tokens with verified real GitHub handles; copy to .github/CODEOWNERS only after review.
+# Owner A authors detections; Owner B is their mandatory reviewer.
+* @OWNER_A_GITHUB_HANDLE @OWNER_B_GITHUB_HANDLE
+/detections/ @OWNER_B_GITHUB_HANDLE
+/response/ @OWNER_A_GITHUB_HANDLE
+/.github/ @OWNER_A_GITHUB_HANDLE @OWNER_B_GITHUB_HANDLE
+/infra/ @OWNER_A_GITHUB_HANDLE @OWNER_B_GITHUB_HANDLE

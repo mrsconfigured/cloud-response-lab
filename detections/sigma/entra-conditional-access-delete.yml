@@ -1,0 +1,22 @@
+title: Entra Conditional Access Policy Deleted
+id: 8a7d441b-870b-4fce-bac4-000000000007
+status: experimental
+description: Successful entra conditional access policy deleted; behavioral signal, not proof of malicious intent. Raw provider field contract; synthetic tests only.
+author: 1xLoZec
+date: 2026-10-14
+tags:
+  - attack.defense-evasion
+  - attack.t1556.009
+logsource:
+  product: azure
+  service: auditlogs
+detection:
+  selection:
+    category: "Policy"
+    activityDisplayName: "Delete conditional access policy"
+    loggedByService: "Core Directory"
+    result: "success"
+  condition: selection
+falsepositives:
+  - Authorized administration or legitimate activity; require actor and change-ticket review.
+level: high

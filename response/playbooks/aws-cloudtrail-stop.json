@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "id": "aws-cloudtrail-stop",
+  "owner": "Owner B",
+  "status": "staged-conceptual-not-shuffle-native",
+  "rule_id": "965a1068-c2bf-4ea5-b1d0-000000000001",
+  "mode": "dry_run",
+  "steps": [
+    "validate",
+    "deduplicate",
+    "summarize",
+    "request_human_review"
+  ],
+  "allowed_accounts": [
+    "111111111111"
+  ],
+  "allowed_tenants": [
+    "00000000-0000-4000-8000-000000000000"
+  ],
+  "max_age_seconds": 3600,
+  "automatic_actions": [],
+  "review_prompt": "Verify sandbox identity, change authorization and original CloudTrail event. Never disable users or keys automatically."
+}

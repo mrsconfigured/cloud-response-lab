@@ -1,0 +1,30 @@
+{
+  "title": "AdministratorAccess attached to IAM user",
+  "id": "965a1068-c2bf-4ea5-b1d0-000000000002",
+  "status": "experimental",
+  "description": "LOCAL STAGED: review required; successful activity only. Not a production verdict.",
+  "author": "Owner A",
+  "date": "2026-10-13",
+  "logsource": {
+    "product": "aws",
+    "service": "cloudtrail"
+  },
+  "detection": {
+    "selection": {
+      "eventSource": "iam.amazonaws.com",
+      "eventName": "AttachUserPolicy",
+      "requestParameters.policyArn": "arn:aws:iam::aws:policy/AdministratorAccess"
+    },
+    "filter_error": {
+      "errorCode": null
+    },
+    "condition": "selection and filter_error"
+  },
+  "falsepositives": [
+    "Authorized lab administration; triage change authorization before escalation."
+  ],
+  "level": "high",
+  "tags": [
+    "attack.t1098"
+  ]
+}
