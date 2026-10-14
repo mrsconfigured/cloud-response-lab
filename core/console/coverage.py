@@ -71,9 +71,11 @@ def embed(snap, old, context=None, digest=False):
     else:
         lines.append('This is the first map, so there is nothing to compare it with yet.')
     new = []
-    if d['rules_added']:
+    if not old:
+        lines.append('It contains %d detection rules and %d response playbooks.' % (len(snap['rules']), len(snap['playbooks'])))
+    if old and d['rules_added']:
         new.append('%d detection rule%s' % (len(d['rules_added']), '' if len(d['rules_added']) == 1 else 's'))
-    if d['playbooks_added']:
+    if old and d['playbooks_added']:
         new.append('%d response playbook%s' % (len(d['playbooks_added']), '' if len(d['playbooks_added']) == 1 else 's'))
     if new:
         lines.append('**New since last time:** ' + ' and '.join(new) + '.')
