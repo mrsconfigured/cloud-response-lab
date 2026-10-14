@@ -1,0 +1,19 @@
+title: "Hunt candidate 1c0c5da2"
+id: dddbb638-077e-590f-b31a-54707ca6a429
+status: experimental
+description: "Candidate promoted from an ad-hoc hunt. Needs review, tests and tuning before it ships. Hunt window 7d, 4 match(es) when saved."
+author: lab-console
+date: 2026-10-14
+tags:
+  - attack.TODO
+logsource:
+  product: aws
+  service: cloudtrail
+detection:
+  selection:
+    eventName: "CreateAccessKey"
+    eventSource: "iam.amazonaws.com"
+  condition: selection
+falsepositives:
+  - "Unknown: review required"
+level: medium
