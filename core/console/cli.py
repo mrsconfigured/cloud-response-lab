@@ -9,7 +9,8 @@ from pathlib import Path
 from core import deploy as deploy_mod
 from core import packs as pk
 from core.console import alerts as al
-from core.console import cipoll, coverage as cov, enrich as en, hunt as hu, metrics as me, outbox as ob, service as sv, status as stt
+from core.console import cipoll, coverage as cov, enrich as en, hunt as hu, metrics as me, outbox as ob, plain as pl, service as sv, status as stt
+from core.console.queries import rel
 from core.console import audit as au
 from core.console import paths
 from core.console.es import Http, load_env
@@ -65,6 +66,10 @@ def cmd_action(a, ctx):
     out(sv.action(ctx, a.alert, a.action, a.by))
 
 
+def cmd_details(a, ctx):
+    out(sv.details(ctx, a.id, a.by))
+
+
 def cmd_confirm(a, ctx):
     out(sv.confirm(ctx, a.approval, a.by))
 
@@ -80,17 +85,23 @@ def cmd_verdict(a, ctx):
 def cmd_enrich(a, ctx):
     principal = sys.stdin.read().strip() if a.stdin else a.principal
     r = en.enrich(ctx.es, principal, a.window)
-    out({'text': en.render(r), 'data': r})
+    rid = pl.stash(ctx.store, 'enrich:' + uuid.uuid4().hex, 'Raw activity record', pl.as_json(r))
+    out({'text': en.render_plain(r), 'card': pl.details_card(rid, label='Show raw') if r['events'] else None})
 
 
 def cmd_hunt(a, ctx):
     query = sys.stdin.read().strip() if a.stdin else a.query
     r = hu.hunt(ctx.es, ctx.store, query, a.window)
     card = None
-    if r.get('hunt_id') and r['total']:
-        card = {'reusable': True, 'text': 'Hunt `%s` \u2014 promote it?' % r['hunt_id'], 'blocks': [{'type': 'actions', 'buttons': [
-            {'label': '\U0001F4BE Save as detection candidate \u00b7 %s' % r['hunt_id'], 'style': 'primary', 'allowedUsers': list(ctx.approvers)}]}]}
-    out({'text': hu.render(r), 'hunt_id': r.get('hunt_id'), 'total': r['total'], 'card': card})
+    if r['total']:
+        raw = pl.stash(ctx.store, 'hunt:' + str(r.get('hunt_id')), 'Raw search and results', pl.as_json({'search': r['query'], 'window': r['window'], 'total': r['total'], 'rows': r['rows'], 'covered_by': r.get('covered')}))
+        buttons = [{'label': '\U0001F50E Show raw \u00b7 %s' % raw, 'style': 'secondary'}]
+        text = '**Show raw** sends you the exact search and raw results privately.'
+        if r.get('hunt_id'):
+            buttons.insert(0, {'label': '\U0001F4BE Turn into a draft detection \u00b7 %s' % r['hunt_id'], 'style': 'primary', 'allowedUsers': list(ctx.approvers)})
+            text = '**Turn into a draft detection** opens a draft pull request for the team to review; nothing goes live. ' + text
+        card = {'reusable': True, 'text': text, 'blocks': [{'type': 'actions', 'buttons': buttons}]}
+    out({'text': hu.render_plain(r), 'hunt_id': r.get('hunt_id'), 'total': r['total'], 'card': card})
 
 
 def cmd_hunt_stub(a, ctx):
@@ -103,13 +114,12 @@ def cmd_hunt_stub(a, ctx):
 
 def cmd_status(a, ctx):
     s = stt.status(ctx.es, ctx.kb, ctx.shuffle, ctx.store)
-    out({'text': stt.render(s), 'data': s})
+    rid = pl.stash(ctx.store, 'status:' + uuid.uuid4().hex, 'Raw status record', pl.as_json(s))
+    out({'text': stt.render_plain(s), 'card': pl.details_card(rid, label='Show raw')})
 
 
 def metrics_embed(s):
-    d = me.render(s)
-    return {'title': '\U0001F4CA Daily SOC scorecard', 'color': 3447003, 'fields': [{'name': k, 'value': v, 'inline': False} for k, v in d.items()], 'timestamp': s['at'],
-            'footer': {'text': 'real data only \u00b7 n/a means nothing to measure yet'}}
+    return pl.metrics_embed(s, rel)
 
 
 def cmd_metrics(a, ctx):
@@ -117,7 +127,7 @@ def cmd_metrics(a, ctx):
     emb = metrics_embed(s)
     if a.post:
         key = 'metrics:' + s['at'][:10]
-        ob.enqueue(ctx.store, key, {'channel': 'metrics', 'kind': 'embed', 'message': 'Daily SOC scorecard', 'embed': emb})
+        ob.enqueue(ctx.store, key, pl.post_with_details(ctx.store, key, 'metrics', emb, 'Raw scorecard numbers', pl.as_json(s)))
     out({'embed': emb, 'raw': s, 'queued': bool(a.post)})
 
 
@@ -136,37 +146,14 @@ def cmd_ci_poll(a, ctx):
     out({'queued': cipoll.poll(ctx, ctx.env['LAB_GITHUB_REPO'])})
 
 
-def render_png(snap, path):
-    html = cov.html(snap)
-    tmp = Path(path).with_suffix('.html')
-    tmp.write_text(html)
-    from playwright.sync_api import sync_playwright
-    with sync_playwright() as p:
-        b = p.chromium.launch(channel='chrome', headless=True)
-        pg = b.new_page(viewport={'width': 1450, 'height': 720})
-        pg.goto('file://' + str(tmp))
-        pg.screenshot(path=str(path), full_page=True)
-        b.close()
-    return str(path)
-
-
 def cmd_coverage_post(a, ctx):
     snap = cov.snapshot(a.root or pk.ROOT)
     old = ctx.store.get('coverage_snapshot', 'latest')
-    d = cov.diff(old['snapshot'] if old else None, snap)
     day = now_iso()[:10]
     key = ('coverage-weekly:' if a.digest else 'coverage-map:') + (day if a.digest else uuid.uuid4().hex[:6])
-    png = render_png(snap, str(paths.state_dir() / ('coverage-%s.png' % day)))
-    fields = [{'name': 'Techniques with an enabled rule', 'value': '%d \u2192 %d' % (d['covered_before'], d['covered_after']), 'inline': True},
-              {'name': 'Rules', 'value': '%d (%s)' % (len(snap['rules']), '+%d new' % len(d['rules_added']) if d['rules_added'] else 'no change'), 'inline': True},
-              {'name': 'Playbooks', 'value': '%d (%s)' % (len(snap['playbooks']), '+%d new' % len(d['playbooks_added']) if d['playbooks_added'] else 'no change'), 'inline': True}]
-    if d['rules_added']:
-        fields.append({'name': 'New rules', 'value': ', '.join(d['rules_added'])[:900], 'inline': False})
-    if d['playbooks_added']:
-        fields.append({'name': 'New playbooks', 'value': ', '.join(d['playbooks_added'])[:900], 'inline': False})
-    emb = {'title': ('\U0001F4E6 What shipped this week' if a.digest else '\U0001F5FA ATT&CK coverage map'), 'color': 3066993, 'fields': fields, 'timestamp': now_iso(),
-           'footer': {'text': 'baseline: ' + ('previous snapshot' if old else 'first snapshot (nothing to compare)')}}
-    ob.enqueue(ctx.store, key, {'channel': 'coverage', 'kind': 'coverage', 'message': emb['title'], 'embed': emb, 'image': png})
+    png = cov.render_png(snap, str(paths.state_dir() / ('coverage-%s.png' % day)))
+    emb, d = cov.embed(snap, old['snapshot'] if old else None, digest=a.digest)
+    ob.enqueue(ctx.store, key, pl.post_with_details(ctx.store, key, 'coverage', emb, 'Every attack type and its rules', cov.details_text(snap), kind='coverage', image=png))
     if a.digest or not old:
         ctx.store.put('coverage_snapshot', 'latest', {'snapshot': snap, 'at': now_iso()})
     out({'queued': key, 'diff': d, 'png': png})
@@ -177,21 +164,21 @@ def cmd_deploy(a, ctx):
         changed = deploy_mod.apply(ctx.kb)
         res = deploy_mod.verify(ctx.kb)
         if changed:
-            ob.enqueue(ctx.store, 'rules-deployed:' + now_iso(), {'channel': 'detection-ci', 'kind': 'embed', 'message': 'Rules deployed', 'embed': {
-                'title': '\U0001F680 Detection rules deployed', 'color': 3066993 if res['match'] else 15158332, 'fields': [
-                    {'name': 'Changed', 'value': ', '.join('%s %s' % (r[:8], w) for r, w in changed)[:900], 'inline': False},
-                    {'name': 'Repo vs Kibana', 'value': 'match' if res['match'] else '%d difference(s)' % len(res['diffs']), 'inline': True},
-                    {'name': 'Enabled', 'value': '%d in repo, %d in Kibana' % (res['enabled_in_repo'], res['enabled_in_kibana']), 'inline': True}]}})
+            k = 'rules-deployed:' + now_iso()
+            emb = {'title': ('\U0001F680 %d detection rule%s updated in Kibana' % (len(changed), '' if len(changed) == 1 else 's')) if res['match'] else '\u26A0\uFE0F Rules were updated but Kibana does not fully match the code',
+                   'color': 3066993 if res['match'] else 15158332,
+                   'description': ('The live rules now match the code exactly. %d are switched on.' % res['enabled_in_kibana']) if res['match'] else '%d difference(s) remain between the code and the live rules.' % len(res['diffs'])}
+            ob.enqueue(ctx.store, k, pl.post_with_details(ctx.store, k, 'detection-ci', emb, 'Which rules changed', pl.as_json({'changed': changed, 'verify': res})))
         out({'changed': changed, 'verify': res})
     else:
         res = deploy_mod.verify(ctx.kb)
         if a.alert and not res['match']:
             import hashlib
             sig = hashlib.sha256(json.dumps(res['diffs'], sort_keys=True, default=str).encode()).hexdigest()[:10]
-            ob.enqueue(ctx.store, 'rule-drift:' + sig, {'channel': 'detection-ci', 'kind': 'embed', 'message': 'Rule drift detected', 'embed': {
-                'title': '\u26A0\uFE0F Deployed rules drifted from the repo', 'color': 15158332, 'fields': [
-                    {'name': 'Differences', 'value': ('\n'.join('%s %s' % (d['name'][:40], d.get('field') or d.get('problem')) for d in res['diffs'][:8]))[:900], 'inline': False},
-                    {'name': 'Fix', 'value': 'Run deploy-rules --apply on the lab host, or fix the repo.', 'inline': False}]}})
+            k = 'rule-drift:' + sig
+            emb = {'title': '\u26A0\uFE0F The live detection rules no longer match the code', 'color': 15158332,
+                   'description': '%d rule setting%s differ between the code and Kibana, so what is running may not be what was reviewed.\n**Suggested next step:** re-apply the code\u2019s rules to Kibana, or fix the code if Kibana is right.' % (len(res['diffs']), '' if len(res['diffs']) == 1 else 's')}
+            ob.enqueue(ctx.store, k, pl.post_with_details(ctx.store, k, 'detection-ci', emb, 'What differs', pl.as_json(res['diffs'])))
         out(res)
 
 
@@ -222,6 +209,7 @@ def main(argv=None):
     s = sub.add_parser('action'); s.add_argument('alert'); s.add_argument('action'); s.add_argument('--by', required=True)
     s = sub.add_parser('approval-confirm'); s.add_argument('approval'); s.add_argument('--by', required=True)
     s = sub.add_parser('approval-cancel'); s.add_argument('approval'); s.add_argument('--by', required=True)
+    s = sub.add_parser('details'); s.add_argument('id'); s.add_argument('--by', default=None)
     s = sub.add_parser('verdict'); s.add_argument('alert'); s.add_argument('kind'); s.add_argument('--by', required=True)
     s = sub.add_parser('enrich'); s.add_argument('principal', nargs='?'); s.add_argument('--window', default='1h'); s.add_argument('--stdin', action='store_true')
     s = sub.add_parser('hunt'); s.add_argument('query', nargs='?'); s.add_argument('--window', default='7d'); s.add_argument('--stdin', action='store_true')
@@ -239,7 +227,7 @@ def main(argv=None):
         return cmd_init(a)
     ctx = sv.Ctx()
     fn = {'alerts-poll': cmd_alerts_poll, 'outbox-next': cmd_outbox_next, 'outbox-ack': cmd_outbox_ack, 'outbox-fail': cmd_outbox_fail, 'action': cmd_action,
-          'approval-confirm': cmd_confirm, 'approval-cancel': cmd_cancel, 'verdict': cmd_verdict, 'enrich': cmd_enrich, 'hunt': cmd_hunt, 'hunt-stub': cmd_hunt_stub,
+          'approval-confirm': cmd_confirm, 'approval-cancel': cmd_cancel, 'verdict': cmd_verdict, 'details': cmd_details, 'enrich': cmd_enrich, 'hunt': cmd_hunt, 'hunt-stub': cmd_hunt_stub,
           'lab-status': cmd_status, 'metrics': cmd_metrics, 'uat-run': cmd_uat_run, 'ci-poll': cmd_ci_poll, 'coverage-post': cmd_coverage_post,
           'deploy-rules': cmd_deploy, 'playbooks-deploy': cmd_playbooks_deploy, 'ingest-record': cmd_ingest_record}[a.cmd]
     fn(a, ctx)

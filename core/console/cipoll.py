@@ -13,6 +13,7 @@ from core import ci as cilib
 from core import packs as pk
 from core.console import coverage as cov
 from core.console import outbox as ob
+from core.console import plain as pl
 from core.console import paths
 
 GREEN, RED, BLUE, GREY = 3066993, 15158332, 3447003, 9807270
@@ -62,66 +63,116 @@ def full_report(ctx, repo, sha, base=None):
     return rep
 
 
+def _n(x):
+    return '%d of %d' % (x['passed'], x['total'])
+
+
 def ci_embed(pr, run, rep):
-    ok = run['conclusion'] == 'success' and 'error' not in rep and not rep['detections']['failed'] and not rep['playbooks']['failed'] and not rep['platform']['failed']
-    f = [{'name': 'CI', 'value': ('\u2705 ' if run['conclusion'] == 'success' else '\u274C ') + run['conclusion'] + ' \u00b7 [run](%s)' % run['html_url'], 'inline': True}]
-    if rep.get('legacy'):
-        f.append({'name': 'Backtest', 'value': 'n/a: ' + rep['error'], 'inline': False})
-    elif 'error' in rep:
-        f.append({'name': 'Backtest', 'value': 'could not run: ' + rep['error'][:200], 'inline': False})
+    n = pr['number']
+    ok_run = run['conclusion'] == 'success'
+    if rep.get('legacy') or 'error' in rep:
+        why = rep.get('error', 'unknown problem')[:200]
+        head = '\u26AA Automatic checks ran for code change #%d, but the deeper tests could not run' % n
+        desc = '**Change:** %s\n**What this means:** the basic check %s, but the detection and response tests did not run (%s).' % (pr['title'], 'passed' if ok_run else 'failed', why)
+        return {'title': head[:250], 'url': pr['html_url'], 'color': GREY, 'description': desc, 'footer': {'text': 'Version %s' % pr['head']['sha'][:7]}}
+    d, p, pl_, br, snap = rep['detections'], rep['playbooks'], rep['platform'], rep.get('backtest_real'), rep.get('snapshot')
+    bad = [x for x in ('detection', 'response', 'platform') if {'detection': d, 'response': p, 'platform': pl_}[x]['failed']] + ([] if (br is None or not br['failed']) else ['replay of past attacks'])
+    ok = ok_run and not bad
+    if ok:
+        head = '\u2705 All automatic checks passed for code change #%d' % n
+        what = 'Every test passed, so this change is ready for a person to review. It has **not** been merged.'
     else:
-        d, p, pl = rep['detections'], rep['playbooks'], rep['platform']
-        f += [{'name': 'Detection backtest (fixtures)', 'value': '%d/%d pass' % (d['passed'], d['total']) + ((' \u00b7 FAIL: ' + ', '.join(d['failed'][:3])) if d['failed'] else ''), 'inline': True},
-              {'name': 'Playbook tests', 'value': '%d/%d pass' % (p['passed'], p['total']), 'inline': True},
-              {'name': 'Platform tests', 'value': '%d/%d pass' % (pl['passed'], pl['total']), 'inline': True}]
-        br = rep.get('backtest_real')
-        f.append({'name': 'Backtest (real events)', 'value': ('%d/%d still fire' % (br['passed'], br['total']) + ((' \u00b7 FAIL: ' + ', '.join(br['failed'])) if br['failed'] else '')) if br else 'n/a (no baseline recorded)', 'inline': True})
-        snap = rep.get('snapshot')
-        if snap:
-            f.append({'name': 'Pack content', 'value': '%d rules \u00b7 %d playbooks \u00b7 %d techniques' % (len(snap['rules']), len(snap['playbooks']), len(snap['techniques'])), 'inline': True})
-    f.append({'name': 'Head', 'value': pr['head']['sha'][:7], 'inline': True})
-    return {'title': ('PR #%d \u00b7 %s' % (pr['number'], pr['title']))[:250], 'url': pr['html_url'], 'color': GREEN if ok else RED, 'fields': f,
-            'footer': {'text': 'detection-ci \u00b7 ' + (run.get('updated_at') or '')[:19] + 'Z'}}
+        head = '\u274C Automatic checks failed for code change #%d' % n
+        what = 'Something failed (%s). Do not merge until it is fixed.' % (', '.join(bad) or 'the basic check')
+    facts = ['Detection tests: %s passed' % _n(d), 'Response tests: %s passed' % _n(p), 'Platform tests: %s passed' % _n(pl_)]
+    facts.append('Replay of past real attacks: ' + (('%s still caught' % _n(br)) if br else 'not available yet'))
+    desc = '**Change:** %s\n**What this means:** %s\n\n%s' % (pr['title'], what, ' \u00b7 '.join(facts))
+    if snap:
+        desc += '\n**This change contains:** %d detection rules and %d response playbooks, covering %d attack types.' % (len(snap['rules']), len(snap['playbooks']), len(snap['techniques']))
+    return {'title': head[:250], 'url': pr['html_url'], 'color': GREEN if ok else RED, 'description': desc,
+            'footer': {'text': 'Version %s \u00b7 checked %s UTC \u00b7 Show details has the full result' % (pr['head']['sha'][:7], (run.get('updated_at') or '')[11:16])}}
+
+
+def ci_details(pr, run, rep):
+    slim = {k: v for k, v in rep.items() if k != 'snapshot'}
+    return 'Code change: %s\nAutomatic check run: %s\nConclusion: %s\n\n%s' % (pr['html_url'], run['html_url'], run['conclusion'], pl.as_json(slim))
 
 
 def uat_embed(pr, rep):
     rows = rep.get('matrix', [])
-    lines = ['%-26s %-40s %-5s %5s' % ('playbook', 'case', 'result', 'ms')]
+    n = pr['number']
+    fails = [r for r in rows if r['status'] != 'pass']
+    if rows and not fails:
+        head = '\u2705 All %d response tests passed (code change #%d)' % (len(rows), n)
+    else:
+        head = '\u274C %d of %d response tests failed (code change #%d)' % (len(fails), len(rows), n)
+    per = {}
     for r in rows:
-        lines.append('%-26s %-40s %-5s %5d' % (r['playbook'][:26], r['case'][:40], r['status'].upper(), r['ms']))
-    ok = rows and all(r['status'] == 'pass' for r in rows)
-    body = '```\n' + '\n'.join(lines)[:3700] + '\n```'
-    return {'title': 'Playbook UAT \u00b7 PR #%d \u00b7 %s' % (pr['number'], 'PASS' if ok else 'FAIL'), 'url': pr['html_url'], 'color': GREEN if ok else RED,
-            'description': body, 'footer': {'text': '%d/%d cases pass \u00b7 head %s \u00b7 response lane sign-off' % (sum(1 for r in rows if r['status'] == 'pass'), len(rows), pr['head']['sha'][:7])}}
+        g = per.setdefault(r['playbook'], [0, 0])
+        g[1] += 1
+        g[0] += r['status'] == 'pass'
+    lines = ['\u2022 %s \u2014 %d of %d passed' % (pl.PB_TITLE.get(k, k), g[0], g[1]) for k, g in sorted(per.items())]
+    desc = 'These tests prove each practice lockdown only acts on the right alerts, always waits for approval, does nothing on harmless events, and leaves an audit record.\n\n' + '\n'.join(lines)
+    if fails:
+        desc += '\n\n**Failing:** ' + ', '.join('%s / %s' % (pl.PB_TITLE.get(r['playbook'], r['playbook']), r['case'].replace('_', ' ')) for r in fails[:5])
+    return {'title': head, 'url': pr['html_url'], 'color': GREEN if rows and not fails else RED, 'description': desc[:4000],
+            'footer': {'text': 'Version %s \u00b7 for the response team to sign off \u00b7 Show details has every test' % pr['head']['sha'][:7]}}
+
+
+def uat_details(rep):
+    rows = rep.get('matrix', [])
+    lines = ['%-26s %-40s %-5s %5s' % ('playbook', 'case', 'result', 'ms')] + ['%-26s %-40s %-5s %5d' % (r['playbook'][:26], r['case'][:40], r['status'].upper(), r['ms']) for r in rows]
+    return '\n'.join(lines)
+
+
+def pr_files(repo, n, pages=10):
+    # GitHub returns at most 100 files per page; a big PR spans several pages
+    names = []
+    for page in range(1, pages + 1):
+        chunk = gh('/repos/%s/pulls/%d/files?per_page=100&page=%d' % (repo, n, page))
+        names += [f['filename'] for f in chunk]
+        if len(chunk) < 100:
+            break
+    return names
+
+
+def _queue(ctx, key, channel, embed, title, body, **extra):
+    if ctx.store.exists('outbox', key):
+        return False
+    return ob.enqueue(ctx.store, key, pl.post_with_details(ctx.store, key, channel, embed, title, body, **extra))
 
 
 def poll(ctx, repo):
     made = []
     for pr in gh('/repos/%s/pulls?state=all&sort=updated&direction=desc&per_page=3' % repo):
         n, sha = pr['number'], pr['head']['sha']
-        if ob.enqueue(ctx.store, 'pr-opened:%d' % n, {'channel': 'detection-ci', 'kind': 'embed', 'message': 'PR #%d opened' % n,
-                      'embed': {'title': 'PR #%d opened \u00b7 %s' % (n, pr['title'])[:250], 'url': pr['html_url'], 'color': BLUE, 'description': 'Branch `%s` into `%s`.' % (pr['head']['ref'], pr['base']['ref'])}}):
+        if _queue(ctx, 'pr-opened:%d' % n, 'detection-ci', {'title': '\U0001F4EC Code change #%d proposed: %s' % (n, pr['title'])[:250], 'url': pr['html_url'], 'color': BLUE,
+                  'description': 'Someone proposed a change to the lab\u2019s code (from branch `%s` into `%s`). Automatic checks will post here when they finish. Nothing is merged until a person decides.' % (pr['head']['ref'], pr['base']['ref'])},
+                  'Code change #%d' % n, 'Link: %s\nBranch: %s into %s' % (pr['html_url'], pr['head']['ref'], pr['base']['ref'])):
             made.append('pr-opened:%d' % n)
-        if pr.get('merged_at') and ob.enqueue(ctx.store, 'pr-merged:%d' % n, {'channel': 'detection-ci', 'kind': 'embed', 'message': 'PR #%d merged' % n,
-                      'embed': {'title': 'PR #%d merged \u00b7 %s' % (n, pr['title'])[:250], 'url': pr['html_url'], 'color': GREEN}}):
+        if pr.get('merged_at') and _queue(ctx, 'pr-merged:%d' % n, 'detection-ci', {'title': '\U0001F500 Code change #%d was merged: %s' % (n, pr['title'])[:250], 'url': pr['html_url'], 'color': GREEN,
+                  'description': 'A person approved this change and it is now part of the lab\u2019s main code.'}, 'Code change #%d merged' % n, 'Link: %s' % pr['html_url']):
             made.append('pr-merged:%d' % n)
+        done_key = '%d:%s' % (n, sha)
+        if ctx.store.exists('ci_done', done_key):
+            continue   # this head is fully handled; an unauthenticated API allows only 60 calls an hour
         runs = gh('/repos/%s/actions/runs?head_sha=%s&per_page=5' % (repo, sha)).get('workflow_runs', [])
         run = next((r for r in runs if r['name'] == 'Offline lab CI' and r['status'] == 'completed'), None)
         key = 'ci:%d:%s' % (n, sha)
-        if not run or ctx.store.exists('outbox', key):
+        if not run:
             continue
         rep = full_report(ctx, repo, sha)
-        files = gh('/repos/%s/pulls/%d/files?per_page=100' % (repo, n))
-        names = [f['filename'] for f in files]
-        ob.enqueue(ctx.store, key, {'channel': 'detection-ci', 'kind': 'embed', 'message': 'PR #%d CI %s' % (n, run['conclusion']), 'embed': ci_embed(pr, run, rep)})
-        made.append(key)
+        names = pr_files(repo, n)
+        if _queue(ctx, key, 'detection-ci', ci_embed(pr, run, rep), 'Automatic check result for code change #%d' % n, ci_details(pr, run, rep)):
+            made.append(key)
         if any(x.startswith('packs/') and '/playbooks/' in x for x in names) and 'error' not in rep:
-            ob.enqueue(ctx.store, 'uat:%d:%s' % (n, sha), {'channel': 'playbook-uat', 'kind': 'embed', 'message': 'Playbook UAT for PR #%d' % n, 'embed': uat_embed(pr, rep)})
-            made.append('uat:%d:%s' % (n, sha))
-        if any(x.startswith('packs/') for x in names) and 'error' not in rep and rep.get('snapshot'):
+            if _queue(ctx, 'uat:%d:%s' % (n, sha), 'playbook-uat', uat_embed(pr, rep), 'Every response test for code change #%d' % n, uat_details(rep)):
+                made.append('uat:%d:%s' % (n, sha))
+        if any(x.startswith('packs/') for x in names) and 'error' not in rep and rep.get('snapshot') and not ctx.store.exists('outbox', 'coverage:%d:%s' % (n, sha)):
             old = ctx.store.get('coverage_snapshot', 'latest')
-            d = cov.diff(old['snapshot'] if old else None, rep['snapshot'])
-            ob.enqueue(ctx.store, 'coverage:%d:%s' % (n, sha), {'channel': 'coverage', 'kind': 'coverage', 'message': 'ATT&CK coverage for PR #%d' % n, 'snapshot': rep['snapshot'], 'diff': d,
-                                                              'title': 'Coverage map \u00b7 PR #%d head %s' % (n, sha[:7])})
-            made.append('coverage:%d:%s' % (n, sha))
+            png = cov.render_png(rep['snapshot'], str(paths.state_dir() / ('coverage-%s.png' % sha[:7])))
+            emb, _ = cov.embed(rep['snapshot'], old['snapshot'] if old else None, 'This map is for code change #%d (version %s).' % (n, sha[:7]))
+            if _queue(ctx, 'coverage:%d:%s' % (n, sha), 'coverage', emb, 'Every attack type and its rules', cov.details_text(rep['snapshot']), kind='coverage', image=png):
+                made.append('coverage:%d:%s' % (n, sha))
+        ctx.store.put('ci_done', done_key, {'status': 'done'})
     return made

@@ -4,6 +4,7 @@ import datetime as dt
 import urllib.parse
 
 from core import packs as pk
+from core.console import plain as pl
 from core.console.fields import first, getf
 from core.console.redact import clean, mask_ip, scrub
 
@@ -67,47 +68,18 @@ def describe(alert, source, pack, attack, cfg, public_url):
             'link': kibana_link(public_url, pack, event_id, when) if event_id and when else None}
 
 
-def build_embed(d, pack, cfg, protect=()):
-    color = cfg['embed_colors'].get(d['severity'], cfg['embed_colors']['low'])
-    fields = [
-        {'name': 'Rule', 'value': d['rule_name'], 'inline': True},
-        {'name': 'ATT&CK', 'value': d['technique_label'], 'inline': True},
-        {'name': 'Severity', 'value': '%s%s' % (d['severity'].upper(), (' \u00b7 risk %s' % d['risk']) if d['risk'] is not None else ''), 'inline': True},
-        {'name': 'Principal / actor', 'value': d['actor'] + ((' (%s)' % d['actor_type']) if d['actor_type'] and d['actor_type'] != d['actor'] else ''), 'inline': True},
-        {'name': 'Event / operation', 'value': d['operation'], 'inline': True},
-        {'name': 'Source', 'value': d['where'], 'inline': True},
-    ]
-    if d['target']:
-        fields.append({'name': 'Target', 'value': d['target'], 'inline': True})
-    fields.append({'name': 'Lane', 'value': d['lane'], 'inline': True})
-    if d['when']:
-        ts = int(dt.datetime.fromisoformat(d['when'].replace('Z', '+00:00')).timestamp())
-        fields.append({'name': 'Event time', 'value': '<t:%d:f> (<t:%d:R>)' % (ts, ts), 'inline': True})
-    if d['link']:
-        fields.append({'name': 'Evidence', 'value': '[View in Kibana](%s)' % d['link'], 'inline': True})
-    emb = {'title': '%s %s' % (SEV_EMOJI.get(d['severity'], ''), d['rule_name']), 'color': color, 'fields': fields,
-           'footer': {'text': '%s \u00b7 event %s' % (pack['log_source'], d['event_id'] or 'n/a')}}
-    if d['link']:
-        emb['url'] = d['link']
-    if d['when']:
-        emb['timestamp'] = d['when'] if d['when'].endswith('Z') else d['when'] + 'Z'
-    return clean(emb, protect)
+def build_embed(d, pack, cfg, protect=(), names=None):
+    return clean(pl.alert_embed(d, pack, cfg, protect, names), protect)
 
 
 def build_buttons(sid, pack, approvers):
-    buttons = []
-    for a in pack['actions']:
-        b = {'label': '%s %s \u00b7 %s' % (ACTION_EMOJI.get(a['id'], ''), a['label'], sid), 'style': a.get('style', 'secondary')}
-        if approvers:
-            b['allowedUsers'] = list(approvers)
-        buttons.append(b)
-    return {'reusable': True, 'text': '**Actions** for alert `%s` \u2014 containment always asks for approval and runs dry-run only.' % sid,
-            'blocks': [{'type': 'actions', 'buttons': buttons[:5]}]}
+    return pl.alert_buttons(sid, pack, approvers)
 
 
 def build_post(alert_doc, source, pack, attack, cfg, public_url, approvers):
     uuid_ = getf(alert_doc, 'kibana.alert.uuid') or alert_doc.get('_id') or ''
     sid = short(uuid_)
     d = describe(alert_doc, source, pack, attack, cfg, public_url)
-    return {'channel': 'alerts', 'kind': 'alert', 'alert_id': sid, 'message': '%s %s \u00b7 %s' % (SEV_EMOJI.get(d['severity'], ''), d['rule_name'], d['lane']),
-            'embed': build_embed(d, pack, cfg, [public_url.rstrip('/')]), 'buttons': build_buttons(sid, pack, approvers), 'summary': d}
+    post = {'channel': 'alerts', 'kind': 'alert', 'alert_id': sid, 'message': '', 'embed': build_embed(d, pack, cfg, [public_url.rstrip('/')], attack),
+            'buttons': build_buttons(sid, pack, approvers), 'summary': d}
+    return pl.finish(post, [public_url.rstrip('/')])

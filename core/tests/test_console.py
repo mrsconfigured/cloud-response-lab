@@ -57,20 +57,19 @@ class Embeds(unittest.TestCase):
 
     def test_aws_alert_has_all_required_fields_and_no_raw_identifiers(self):
         p = self.post('aws', alert(), NASTY)
-        self.assertTrue(p['embed']['url'].startswith('http://100.64.1.2:5601/'), 'the Kibana host must survive redaction')
-        names = [f['name'] for f in p['embed']['fields']]
-        for need in ('Rule', 'ATT&CK', 'Severity', 'Principal / actor', 'Event / operation', 'Source', 'Lane', 'Event time', 'Evidence'):
-            self.assertIn(need, names)
-        self.assertEqual(p['embed']['color'], CFG['embed_colors']['high'])
-        self.assertIn('T1098.001', json.dumps(p['embed']))
-        self.assertIn(NASTY['eventID'], p['embed']['footer']['text'])
-        self.assertIn('AWS CloudTrail', p['embed']['footer']['text'])
-        self.assertEqual(redact.leaks(json.dumps(p['embed']).replace('100.64.1.2', 'kibana-host')), [], json.dumps(p['embed']))
-        url = p['embed']['url']
+        e = p['embed']
+        self.assertNotIn('url', e, 'the technical link lives behind Show details, not on the card')
+        self.assertEqual(e['color'], CFG['embed_colors']['high'])
+        text = json.dumps(e)
+        self.assertIn('T1098.001', text)
+        self.assertIn('someone added a new password or access key to an account', text, 'the technique is explained in plain words')
+        self.assertIn('AWS CloudTrail', e['footer']['text'])
+        self.assertNotIn(NASTY['eventID'], text, 'the raw event id belongs in the details, not on the card')
+        self.assertEqual(redact.leaks(text.replace('100.64.1.2', 'kibana-host')), [], text)
+        url = p['summary']['link']
         for bad in ('"', "'", '(', ')', ' '):
-            self.assertNotIn(bad, url, 'embed URLs must be fully percent-encoded: ' + repr(bad))
+            self.assertNotIn(bad, url, 'the Kibana link must be fully percent-encoded: ' + repr(bad))
         self.assertIn('%22' + NASTY['eventID'] + '%22', url)
-        self.assertIn('Detection', json.dumps(p['embed']))
 
     def test_severity_colours(self):
         for sev in ('high', 'medium', 'low'):
@@ -79,16 +78,16 @@ class Embeds(unittest.TestCase):
     def test_button_sets_follow_the_pack(self):
         aws = self.post('aws', alert(), NASTY)['buttons']['blocks'][0]['buttons']
         ent = self.post('entra', alert('Entra Application Consent', tags=('attack.t1528',)), ENTRA)['buttons']['blocks'][0]['buttons']
-        self.assertEqual([b['label'].split(' ', 1)[1].split(' \u00b7')[0] for b in aws], ['Acknowledge', 'Investigate', 'Contain'])
-        self.assertEqual([b['label'].split(' ', 1)[1].split(' \u00b7')[0] for b in ent], ['Acknowledge', 'Reset MFA', 'Revoke sessions', 'Disable principal'])
-        self.assertTrue(all(b['allowedUsers'] == ['u1', 'u2'] for b in aws + ent))
+        name = lambda b: b['label'].split(' ', 1)[1].split(' \u00b7')[0]
+        self.assertEqual([name(b) for b in aws], ['Mark as seen', 'Investigate', 'Request lockdown', 'Show details'])
+        self.assertEqual([name(b) for b in ent], ['Mark as seen', 'Reset 2-step sign-in', 'Sign user out everywhere', 'Disable the application', 'Show details'])
+        self.assertTrue(all(b['allowedUsers'] == ['u1', 'u2'] for b in aws[:-1] + ent[:-1]))
         self.assertTrue(all(post_id in aws[0]['label'] for post_id in ['abcdef12']))
 
     def test_entra_alert_masks_the_user_and_the_address(self):
         p = self.post('entra', alert('Entra Application Consent', tags=('attack.t1528',)), ENTRA)
         text = json.dumps(p['embed'])
         self.assertEqual(redact.leaks(text.replace('100.64.1.2', 'kibana-host')), [], text)
-        self.assertIn('Identity', text)
         self.assertNotIn('real.person', text)
 
     def test_a_brand_new_pack_needs_no_console_change(self):
@@ -215,6 +214,33 @@ class Coverage(unittest.TestCase):
             self.assertEqual(json.loads((ROOT / 'packs' / name / 'attack-layer.json').read_text()), layer, name + ' layer is stale: run python -m library.build')
 
 
+class ServiceRedaction(unittest.TestCase):
+    def ctx(self):
+        from types import SimpleNamespace
+        from core.console import playbooks as pbk
+        from core.console.audit import MemoryAudit
+        store, audit, ex = MemoryStore(), MemoryAudit(), pbk.FakeExecutor()
+        approvers = {'u1': 'detection-owner'}
+        c = SimpleNamespace(store=store, audit=audit, approvers=approvers, env={'LAB_KIBANA_PUBLIC': 'http://100.64.1.2:5601'}, cfg=CFG, attack=ATT, es=None, kb=None, packs=pk.packs())
+        c.gate = lambda: pbk.Gate(store, audit, ex, approvers)
+        c.who = lambda uid: approvers.get(str(uid))
+        return c, store, ex
+
+    def test_an_email_address_target_never_reaches_discord_text_but_still_drives_the_plan(self):
+        from core.console import service as sv
+        c, store, ex = self.ctx()
+        store.put('alert', 'sidtest1', {'status': 'open', 'pack': 'entra', 'rule_id': '8a7d441b-870b-4fce-bac4-000000000005', 'rule_name': 'Entra Directory Role Member Added',
+                                        'severity': 'high', 'event': ENTRA, 'alert_time': '2026-10-14T19:38:49Z', 'technique': 'T1098.003', 'alert_doc_id': 'x'})
+        r = sv.action(c, 'sidtest1', 'revoke_sessions', 'u1')
+        self.assertTrue(r['ok'], r)
+        self.assertNotIn('real.person', json.dumps(r), 'the approval prompt must mask the user')
+        done = sv.confirm(c, r['approval_id'], 'u1')
+        self.assertTrue(done['ok'], done)
+        self.assertNotIn('real.person', done['text'])
+        self.assertEqual(ex.calls[0]['payload']['target'], 'real.person@contoso.example', 'the real value still drives the dry-run plan')
+        self.assertEqual(r['approval_id'], r['card']['blocks'][0]['buttons'][0]['label'].split(' \u00b7 ')[1], 'button labels must keep the exact approval id')
+
+
 class CiCards(unittest.TestCase):
     def test_a_commit_that_predates_the_pack_structure_is_reported_as_n_a_not_as_a_failure(self):
         from core.console import cipoll
@@ -222,8 +248,54 @@ class CiCards(unittest.TestCase):
         run = {'conclusion': 'success', 'html_url': 'https://example.test/run/1', 'updated_at': '2026-10-14T19:45:47Z'}
         emb = cipoll.ci_embed(pr, run, {'legacy': True, 'error': 'this commit predates the pack structure, so there is nothing to backtest'})
         text = json.dumps(emb)
-        self.assertIn('n/a: this commit predates', text)
-        self.assertNotIn('could not run', text)
+        self.assertIn('predates the pack structure', text)
+        self.assertNotIn('failed', text.lower().replace('the deeper tests could not run', ''))
+
+
+class PrFiles(unittest.TestCase):
+    def test_a_pr_with_more_than_one_page_of_files_is_read_to_the_end(self):
+        from core.console import cipoll
+        pages = {1: [{'filename': 'f%d' % i} for i in range(100)], 2: [{'filename': 'packs/aws/playbooks/x.json'}] + [{'filename': 'g%d' % i} for i in range(5)]}
+        orig = cipoll.gh
+        cipoll.gh = lambda path: pages[int(path.rsplit('page=', 1)[1])]
+        try:
+            names = cipoll.pr_files('o/r', 1)
+        finally:
+            cipoll.gh = orig
+        self.assertEqual(len(names), 106)
+        self.assertIn('packs/aws/playbooks/x.json', names)
+
+
+class CiPollIdempotence(unittest.TestCase):
+    def test_a_handled_head_costs_no_further_api_calls(self):
+        from types import SimpleNamespace
+        from core.console import cipoll
+        store = MemoryStore()
+        store.put('ci_done', '1:abc', {'status': 'done'})
+        calls = []
+        orig = cipoll.gh
+        def fake(path):
+            calls.append(path)
+            if '/pulls?' in path:
+                return [{'number': 1, 'head': {'sha': 'abc', 'ref': 'b'}, 'base': {'ref': 'main'}, 'title': 't', 'html_url': 'u', 'merged_at': None}]
+            raise AssertionError('no further call is allowed for a finished head: ' + path)
+        cipoll.gh = fake
+        try:
+            cipoll.poll(SimpleNamespace(store=store), 'o/r')
+        finally:
+            cipoll.gh = orig
+        self.assertEqual(len(calls), 1)
+
+
+class CoverageEmbed(unittest.TestCase):
+    def test_embed_reports_the_change_against_the_previous_snapshot(self):
+        snap = cov.snapshot()
+        emb, d = cov.embed(snap, None)
+        self.assertIn('We can currently catch %d of the %d' % (d['covered_after'], len(snap['techniques'])), emb['title'])
+        self.assertIn('first map', emb['description'])
+        emb2, d2 = cov.embed(snap, snap)
+        self.assertIn('no change', emb2['description'])
+        self.assertEqual(d2['rules_added'], [])
 
 
 class Packs(unittest.TestCase):

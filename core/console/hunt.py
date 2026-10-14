@@ -7,6 +7,7 @@ from pathlib import Path
 
 from core import packs as pk
 from core.console.fields import first, getf
+from core.console import plain as pl
 from core.console.queries import TECH, esc, index_pattern, parse_window, rel
 from core.console.redact import clean, mask_ip, scrub
 from core.console.store import now_iso
@@ -89,6 +90,21 @@ def render(h):
     if h.get('hunt_id') and h['total']:
         lines.append('Save this as a detection candidate with the button below (hunt ' + BT + h['hunt_id'] + BT + ').')
     return '\n'.join(lines)
+
+
+def render_plain(h):
+    """Verdict first: did anything match, and is it already covered by a rule?"""
+    w = h['window']
+    if not h['total']:
+        return pl.say('**Nothing matched** in the last %s, so there is nothing to act on.' % w)
+    if h.get('covered'):
+        verdict = '**Found %d matching event%s** in the last %s. A rule already catches these (%s), so no new detection is needed.' % (h['total'], '' if h['total'] == 1 else 's', w, ', '.join(h['covered']))
+    else:
+        verdict = '**Found %d matching event%s** in the last %s and **no alert fired on the ones shown** \u2014 this could be a gap in our detection. You can turn the search into a draft detection with the button below.' % (h['total'], '' if h['total'] == 1 else 's', w)
+    lines = [verdict, '**Most recent:**']
+    for x in h['rows'][:8]:
+        lines.append('\u2022 %s \u2014 %s did: %s%s' % ((x['time'] or '')[5:19].replace('T', ' '), x['actor'], pl.op_plain(x['op']), (' (from ' + x['src'] + ')') if x['src'] else ''))
+    return pl.say('\n'.join(lines))
 
 
 _TERM = re.compile(r'^([A-Za-z_][A-Za-z0-9_.]*):("([^"]*)"|[^\s()]+)$')

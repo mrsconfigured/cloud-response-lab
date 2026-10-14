@@ -2,6 +2,7 @@
 import datetime as dt
 
 from core import packs as pk
+from core.console import plain as pl
 from core.console.fields import getf
 from core.console.queries import rel
 
@@ -63,3 +64,33 @@ def render(s):
     L.append('Alerts (24h): %d \u00b7 Shuffle: %s \u00b7 Discord outbox: %d pending, %d failed' % (s['alerts_24h'], s['shuffle'], s['outbox']['pending'], s['outbox']['failed']))
     L.append('Playbooks passing: ' + ('%s/%s (run %s)' % (s['playbooks']['passing'], s['playbooks']['total'], (s['playbooks']['at'] or '')[:16]) if s['playbooks'] else 'n/a (no UAT run recorded)'))
     return '\n'.join(L)
+
+
+def render_plain(s):
+    problems = []
+    if s['elastic']['status'] != 'green':
+        problems.append('the search database is ' + s['elastic']['status'])
+    if s['shuffle'] != 'up':
+        problems.append('the response automation (Shuffle) is ' + s['shuffle'])
+    r = s['rules']
+    if 'error' in r:
+        problems.append('the rule list could not be read')
+    elif r['failing']:
+        problems.append('rules failing: ' + ', '.join(r['failing']))
+    if s['outbox']['failed']:
+        problems.append('%d Discord post(s) failed to send' % s['outbox']['failed'])
+    for x in s['sources']:
+        if 'error' in x:
+            problems.append('%s could not be read' % x['pack'])
+    L = [('\u2705 **Everything is healthy.**' if not problems else '\u26A0\uFE0F **Needs attention:** ' + '; '.join(problems) + '.')]
+    L.append('\u2022 **Search database:** ' + s['elastic']['status'])
+    for x in s['sources']:
+        if 'error' not in x:
+            L.append('\u2022 **%s:** %d records, newest event %s ago' % (x['log_source'], x['docs'], x['lag']))
+    L.append('\u2022 **Detection rules:** ' + ('%d of %d switched on, %d ran fine at their last check' % (r['enabled'], r['total'], r['last_run_ok']) if 'total' in r else 'unknown'))
+    L.append('\u2022 **Alerts in the last 24 hours:** %d' % s['alerts_24h'])
+    L.append('\u2022 **Response automation (Shuffle):** ' + s['shuffle'])
+    L.append('\u2022 **Discord posts waiting to send:** %d' % s['outbox']['pending'])
+    pb = s['playbooks']
+    L.append('\u2022 **Response tests:** ' + ('%s of %s passing' % (pb['passing'], pb['total']) if pb else 'no run recorded yet'))
+    return pl.say('\n'.join(L))

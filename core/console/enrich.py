@@ -4,6 +4,7 @@ import datetime as dt
 from core import packs as pk
 from core.console.fields import first, getf
 from core.console.queries import esc, parse_window, rel
+from core.console import plain as pl
 from core.console.redact import clean, mask_ip, scrub
 
 
@@ -72,3 +73,22 @@ def render(r):
     for x in r['timeline'][:12]:
         lines.append('\u2022 `%s` %s \u00b7 %s%s' % ((x['time'] or '')[11:19], x['op'], x['pack'], '' if x['ok'] else ' \u00b7 failed'))
     return '\n'.join(lines)
+
+
+def render_plain(r):
+    """Verdict first, then what the account did, in everyday words."""
+    if not r['events']:
+        return pl.say('I found **no activity** for `%s` in the last %s, so there is nothing to look into.' % (r['principal'], r['window']))
+    chain = [pl.TECH_PLAIN.get(t) or pl.TECH_PLAIN.get(t.split('.')[0]) or t for t in r['technique_chain']]
+    verdict = ('Detection rules fired on this account, in this order: ' + '; then '.join(chain) + '.') if chain else 'No detection rules fired for this account.'
+    lines = ['**%d action%s** by `%s` in the last %s. %s' % (r['events'], '' if r['events'] == 1 else 's', r['principal'], r['window'], verdict)]
+    lines.append('**Access keys created:** ' + ('; '.join(r['access_keys']) if r['access_keys'] else 'none in this period.'))
+    mfa = []
+    for m in r['mfa']:
+        used = m.rsplit(' ', 1)[-1].lower() in ('true', 'yes')
+        mfa.append(('signed in with a second verification step' if used else 'signed in WITHOUT a second verification step') + (' (console)' if m.startswith('console') else ''))
+    lines.append('**Second verification step (multi-factor authentication):** ' + ('; '.join(mfa) if mfa else 'not shown in these events.'))
+    lines.append('**What it did** (newest first, up to 12):')
+    for x in r['timeline'][:12]:
+        lines.append('\u2022 %s \u2014 %s%s' % ((x['time'] or '')[11:19], pl.op_plain(x['op']), '' if x['ok'] else ' (it failed)'))
+    return pl.say('\n'.join(lines))
