@@ -1,0 +1,122 @@
+{
+  "positive": [
+    {
+      "name": "user created",
+      "event": {
+        "id": "00000000-0000-4000-8000-000000000106",
+        "activityDateTime": "2026-10-14T19:32:04Z",
+        "loggedByService": "Core Directory",
+        "result": "success",
+        "operationType": "Add",
+        "initiatedBy": {
+          "user": {
+            "id": "00000000-0000-4000-8000-000000000107",
+            "userPrincipalName": "operator@example.invalid",
+            "ipAddress": "203.0.113.20",
+            "displayName": "Lab Operator"
+          },
+          "app": null
+        },
+        "targetResources": [
+          {
+            "id": "00000000-0000-4000-8000-000000000104",
+            "type": "User",
+            "displayName": "New User",
+            "userPrincipalName": "new.user@example.invalid"
+          }
+        ],
+        "category": "UserManagement",
+        "activityDisplayName": "Add user"
+      }
+    }
+  ],
+  "negative": [
+    {
+      "name": "neighbour: Delete user",
+      "event": {
+        "id": "00000000-0000-4000-8000-000000000110",
+        "activityDateTime": "2026-10-14T19:32:04Z",
+        "loggedByService": "Core Directory",
+        "result": "success",
+        "operationType": "Add",
+        "initiatedBy": {
+          "user": {
+            "id": "00000000-0000-4000-8000-000000000111",
+            "userPrincipalName": "operator@example.invalid",
+            "ipAddress": "203.0.113.20",
+            "displayName": "Lab Operator"
+          },
+          "app": null
+        },
+        "targetResources": [
+          {
+            "id": "00000000-0000-4000-8000-000000000109",
+            "type": "ServicePrincipal",
+            "displayName": "example-app",
+            "userPrincipalName": null
+          }
+        ],
+        "category": "UserManagement",
+        "activityDisplayName": "Delete user"
+      }
+    },
+    {
+      "name": "failed attempt",
+      "event": {
+        "id": "00000000-0000-4000-8000-000000000114",
+        "activityDateTime": "2026-10-14T19:32:04Z",
+        "loggedByService": "Core Directory",
+        "result": "failure",
+        "operationType": "Add",
+        "initiatedBy": {
+          "user": {
+            "id": "00000000-0000-4000-8000-000000000115",
+            "userPrincipalName": "operator@example.invalid",
+            "ipAddress": "203.0.113.20",
+            "displayName": "Lab Operator"
+          },
+          "app": null
+        },
+        "targetResources": [
+          {
+            "id": "00000000-0000-4000-8000-000000000113",
+            "type": "ServicePrincipal",
+            "displayName": "example-app",
+            "userPrincipalName": null
+          }
+        ],
+        "category": "UserManagement",
+        "activityDisplayName": "Add user"
+      }
+    },
+    {
+      "name": "real neighbour: Update company",
+      "event": {
+        "id": "00000000-0000-4000-8000-000000000118",
+        "activityDateTime": "2026-10-14T19:32:04Z",
+        "loggedByService": "Core Directory",
+        "result": "success",
+        "operationType": "Add",
+        "initiatedBy": {
+          "user": {
+            "id": "00000000-0000-4000-8000-000000000119",
+            "userPrincipalName": "operator@example.invalid",
+            "ipAddress": "203.0.113.20",
+            "displayName": "Lab Operator"
+          },
+          "app": null
+        },
+        "targetResources": [
+          {
+            "id": "00000000-0000-4000-8000-000000000117",
+            "type": "ServicePrincipal",
+            "displayName": "example-app",
+            "userPrincipalName": null
+          }
+        ],
+        "category": "DirectoryManagement",
+        "activityDisplayName": "Update company"
+      }
+    }
+  ]
+}

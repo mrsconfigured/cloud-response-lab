@@ -1,0 +1,151 @@
+{
+  "positive": [
+    {
+      "name": "consent to application",
+      "event": {
+        "id": "00000000-0000-4000-8000-000000000085",
+        "activityDateTime": "2026-10-14T19:32:04Z",
+        "loggedByService": "Core Directory",
+        "result": "success",
+        "operationType": "Add",
+        "initiatedBy": {
+          "user": {
+            "id": "00000000-0000-4000-8000-000000000086",
+            "userPrincipalName": "operator@example.invalid",
+            "ipAddress": "203.0.113.20",
+            "displayName": "Lab Operator"
+          },
+          "app": null
+        },
+        "targetResources": [
+          {
+            "id": "00000000-0000-4000-8000-000000000084",
+            "type": "ServicePrincipal",
+            "displayName": "example-app",
+            "userPrincipalName": null
+          }
+        ],
+        "category": "ApplicationManagement",
+        "activityDisplayName": "Consent to application"
+      }
+    },
+    {
+      "name": "delegated permission grant",
+      "event": {
+        "id": "00000000-0000-4000-8000-000000000089",
+        "activityDateTime": "2026-10-14T19:32:04Z",
+        "loggedByService": "Core Directory",
+        "result": "success",
+        "operationType": "Add",
+        "initiatedBy": {
+          "user": {
+            "id": "00000000-0000-4000-8000-000000000090",
+            "userPrincipalName": "operator@example.invalid",
+            "ipAddress": "203.0.113.20",
+            "displayName": "Lab Operator"
+          },
+          "app": null
+        },
+        "targetResources": [
+          {
+            "id": "00000000-0000-4000-8000-000000000088",
+            "type": "ServicePrincipal",
+            "displayName": "example-app",
+            "userPrincipalName": null
+          }
+        ],
+        "category": "ApplicationManagement",
+        "activityDisplayName": "Add delegated permission grant"
+      }
+    }
+  ],
+  "negative": [
+    {
+      "name": "real neighbour: Add application",
+      "event": {
+        "id": "00000000-0000-4000-8000-000000000093",
+        "activityDateTime": "2026-10-14T19:32:04Z",
+        "loggedByService": "Core Directory",
+        "result": "success",
+        "operationType": "Add",
+        "initiatedBy": {
+          "user": {
+            "id": "00000000-0000-4000-8000-000000000094",
+            "userPrincipalName": "operator@example.invalid",
+            "ipAddress": "203.0.113.20",
+            "displayName": "Lab Operator"
+          },
+          "app": null
+        },
+        "targetResources": [
+          {
+            "id": "00000000-0000-4000-8000-000000000092",
+            "type": "ServicePrincipal",
+            "displayName": "example-app",
+            "userPrincipalName": null
+          }
+        ],
+        "category": "ApplicationManagement",
+        "activityDisplayName": "Add application"
+      }
+    },
+    {
+      "name": "failed consent",
+      "event": {
+        "id": "00000000-0000-4000-8000-000000000097",
+        "activityDateTime": "2026-10-14T19:32:04Z",
+        "loggedByService": "Core Directory",
+        "result": "failure",
+        "operationType": "Add",
+        "initiatedBy": {
+          "user": {
+            "id": "00000000-0000-4000-8000-000000000098",
+            "userPrincipalName": "operator@example.invalid",
+            "ipAddress": "203.0.113.20",
+            "displayName": "Lab Operator"
+          },
+          "app": null
+        },
+        "targetResources": [
+          {
+            "id": "00000000-0000-4000-8000-000000000096",
+            "type": "ServicePrincipal",
+            "displayName": "example-app",
+            "userPrincipalName": null
+          }
+        ],
+        "category": "ApplicationManagement",
+        "activityDisplayName": "Consent to application"
+      }
+    },
+    {
+      "name": "wrong category",
+      "event": {
+        "id": "00000000-0000-4000-8000-000000000101",
+        "activityDateTime": "2026-10-14T19:32:04Z",
+        "loggedByService": "Core Directory",
+        "result": "success",
+        "operationType": "Add",
+        "initiatedBy": {
+          "user": {
+            "id": "00000000-0000-4000-8000-000000000102",
+            "userPrincipalName": "operator@example.invalid",
+            "ipAddress": "203.0.113.20",
+            "displayName": "Lab Operator"
+          },
+          "app": null
+        },
+        "targetResources": [
+          {
+            "id": "00000000-0000-4000-8000-000000000100",
+            "type": "ServicePrincipal",
+            "displayName": "example-app",
+            "userPrincipalName": null
+          }
+        ],
+        "category": "Policy",
+        "activityDisplayName": "Consent to application"
+      }
+    }
+  ]
+}

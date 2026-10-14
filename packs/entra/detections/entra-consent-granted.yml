@@ -1,0 +1,24 @@
+title: "Entra Application Consent Or Delegated Permission Granted"
+id: 8a7d441b-870b-4fce-bac4-000000000009
+status: experimental
+description: "Successful user or admin consent to an application, or a delegated permission grant, in directory audit logs. Illicit consent is a known token-theft path; treat as a signal and verify the app and the permissions."
+author: 1xLoZec
+date: 2026-10-14
+tags:
+  - attack.credential-access
+  - attack.t1528
+logsource:
+  product: azure
+  service: auditlogs
+detection:
+  selection:
+    category: "ApplicationManagement"
+    activityDisplayName:
+      - "Consent to application"
+      - "Add delegated permission grant"
+    loggedByService: "Core Directory"
+    result: "success"
+  condition: selection
+falsepositives:
+  - "Legitimate admin consent for a sanctioned app; verify publisher and requested scopes."
+level: high

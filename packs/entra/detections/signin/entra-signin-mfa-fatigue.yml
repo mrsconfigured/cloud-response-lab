@@ -1,0 +1,19 @@
+title: "Entra MFA Prompt Not Answered (MFA Fatigue Proxy)"
+id: 8a7d441b-870b-4fce-bac4-00000000000b
+status: experimental
+description: "Sign-in failed because the user did not respond to the MFA request (error 500121). A repeated run of these is the MFA fatigue pattern. FIXTURE ONLY: sign-in logs need Entra ID P1 or P2."
+author: 1xLoZec
+date: 2026-10-14
+tags:
+  - attack.credential-access
+  - attack.t1621
+logsource:
+  product: azure
+  service: signinlogs
+detection:
+  selection:
+    status.errorCode: "500121"
+  condition: selection
+falsepositives:
+  - "A user who ignored a legitimate prompt; look for repetition, not a single event."
+level: medium

@@ -67,5 +67,35 @@
       ],
       "requestParameters.policyArn": "arn:aws:iam::aws:policy/AdministratorAccess"
     }
+  },
+  "entra-app-role-assignment": {
+    "provider": "entra",
+    "selection": {
+      "category": "ApplicationManagement",
+      "activityDisplayName": "Add app role assignment to service principal",
+      "loggedByService": "Core Directory",
+      "result": "success"
+    }
+  },
+  "entra-consent-granted": {
+    "provider": "entra",
+    "selection": {
+      "category": "ApplicationManagement",
+      "activityDisplayName": [
+        "Consent to application",
+        "Add delegated permission grant"
+      ],
+      "loggedByService": "Core Directory",
+      "result": "success"
+    }
+  },
+  "entra-user-created": {
+    "provider": "entra",
+    "selection": {
+      "category": "UserManagement",
+      "activityDisplayName": "Add user",
+      "loggedByService": "Core Directory",
+      "result": "success"
+    }
   }
 }

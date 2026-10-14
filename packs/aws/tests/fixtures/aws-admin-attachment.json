@@ -1,0 +1,137 @@
+{
+  "positive": [
+    {
+      "name": "admin policy to a user",
+      "event": {
+        "eventVersion": "1.11",
+        "eventTime": "2026-10-14T19:32:04Z",
+        "awsRegion": "us-east-1",
+        "sourceIPAddress": "203.0.113.10",
+        "userAgent": "lab-test-agent",
+        "recipientAccountId": "111111111111",
+        "readOnly": false,
+        "managementEvent": true,
+        "eventType": "AwsApiCall",
+        "eventID": "00000000-0000-4000-8000-000000000005",
+        "userIdentity": {
+          "type": "IAMUser",
+          "userName": "lab-operator",
+          "accountId": "111111111111"
+        },
+        "eventSource": "iam.amazonaws.com",
+        "eventName": "AttachUserPolicy",
+        "requestParameters": {
+          "userName": "example-user",
+          "policyArn": "arn:aws:iam::aws:policy/AdministratorAccess"
+        }
+      }
+    },
+    {
+      "name": "admin policy to a role",
+      "event": {
+        "eventVersion": "1.11",
+        "eventTime": "2026-10-14T19:32:04Z",
+        "awsRegion": "us-east-1",
+        "sourceIPAddress": "203.0.113.10",
+        "userAgent": "lab-test-agent",
+        "recipientAccountId": "111111111111",
+        "readOnly": false,
+        "managementEvent": true,
+        "eventType": "AwsApiCall",
+        "eventID": "00000000-0000-4000-8000-000000000006",
+        "userIdentity": {
+          "type": "IAMUser",
+          "userName": "lab-operator",
+          "accountId": "111111111111"
+        },
+        "eventSource": "iam.amazonaws.com",
+        "eventName": "AttachRolePolicy",
+        "requestParameters": {
+          "roleName": "example-role",
+          "policyArn": "arn:aws:iam::aws:policy/AdministratorAccess"
+        }
+      }
+    }
+  ],
+  "negative": [
+    {
+      "name": "read-only policy",
+      "event": {
+        "eventVersion": "1.11",
+        "eventTime": "2026-10-14T19:32:04Z",
+        "awsRegion": "us-east-1",
+        "sourceIPAddress": "203.0.113.10",
+        "userAgent": "lab-test-agent",
+        "recipientAccountId": "111111111111",
+        "readOnly": false,
+        "managementEvent": true,
+        "eventType": "AwsApiCall",
+        "eventID": "00000000-0000-4000-8000-000000000007",
+        "userIdentity": {
+          "type": "IAMUser",
+          "userName": "lab-operator",
+          "accountId": "111111111111"
+        },
+        "eventSource": "iam.amazonaws.com",
+        "eventName": "AttachUserPolicy",
+        "requestParameters": {
+          "userName": "example-user",
+          "policyArn": "arn:aws:iam::aws:policy/ReadOnlyAccess"
+        }
+      }
+    },
+    {
+      "name": "admin policy but denied",
+      "event": {
+        "eventVersion": "1.11",
+        "eventTime": "2026-10-14T19:32:04Z",
+        "awsRegion": "us-east-1",
+        "sourceIPAddress": "203.0.113.10",
+        "userAgent": "lab-test-agent",
+        "recipientAccountId": "111111111111",
+        "readOnly": false,
+        "managementEvent": true,
+        "eventType": "AwsApiCall",
+        "eventID": "00000000-0000-4000-8000-000000000008",
+        "userIdentity": {
+          "type": "IAMUser",
+          "userName": "lab-operator",
+          "accountId": "111111111111"
+        },
+        "eventSource": "iam.amazonaws.com",
+        "eventName": "AttachUserPolicy",
+        "requestParameters": {
+          "userName": "example-user",
+          "policyArn": "arn:aws:iam::aws:policy/AdministratorAccess"
+        },
+        "errorCode": "AccessDenied"
+      }
+    },
+    {
+      "name": "neighbour: DetachUserPolicy",
+      "event": {
+        "eventVersion": "1.11",
+        "eventTime": "2026-10-14T19:32:04Z",
+        "awsRegion": "us-east-1",
+        "sourceIPAddress": "203.0.113.10",
+        "userAgent": "lab-test-agent",
+        "recipientAccountId": "111111111111",
+        "readOnly": false,
+        "managementEvent": true,
+        "eventType": "AwsApiCall",
+        "eventID": "00000000-0000-4000-8000-000000000009",
+        "userIdentity": {
+          "type": "IAMUser",
+          "userName": "lab-operator",
+          "accountId": "111111111111"
+        },
+        "eventSource": "iam.amazonaws.com",
+        "eventName": "DetachUserPolicy",
+        "requestParameters": {
+          "userName": "example-user",
+          "policyArn": "arn:aws:iam::aws:policy/AdministratorAccess"
+        }
+      }
+    }
+  ]
+}

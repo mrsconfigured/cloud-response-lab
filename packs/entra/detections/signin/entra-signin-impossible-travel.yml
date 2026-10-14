@@ -1,0 +1,19 @@
+title: "Entra Impossible Travel Risk Event"
+id: 8a7d441b-870b-4fce-bac4-00000000000c
+status: experimental
+description: "Sign-in flagged with the unlikelyTravel risk event type. FIXTURE ONLY: sign-in logs and Identity Protection risk data need Entra ID P1 or P2."
+author: 1xLoZec
+date: 2026-10-14
+tags:
+  - attack.initial-access
+  - attack.t1078.004
+logsource:
+  product: azure
+  service: signinlogs
+detection:
+  selection:
+    riskEventTypes_v2: "unlikelyTravel"
+  condition: selection
+falsepositives:
+  - "VPN egress changes and travel; confirm with the user."
+level: high

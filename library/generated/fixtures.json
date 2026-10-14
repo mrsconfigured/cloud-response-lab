@@ -1172,6 +1172,262 @@
       }
     }
   ],
+  "entra-app-role-assignment": [
+    {
+      "name": "successful-operation",
+      "expected": true,
+      "event": {
+        "id": "fa50adcf-2bf0-5082-bd87-2afd6016c3f2",
+        "activityDateTime": "2026-10-14T01:00:00Z",
+        "tenantId": "00000000-0000-4000-8000-000000000001",
+        "initiatedBy": {
+          "user": {
+            "id": "00000000-0000-4000-8000-000000000001",
+            "userPrincipalName": "synthetic@example.invalid"
+          }
+        },
+        "targetResources": [
+          {
+            "id": "00000000-0000-4000-8000-000000000001",
+            "type": "DirectoryRole"
+          }
+        ],
+        "category": "ApplicationManagement",
+        "activityDisplayName": "Add app role assignment to service principal",
+        "loggedByService": "Core Directory",
+        "result": "success"
+      }
+    },
+    {
+      "name": "wrong-category",
+      "expected": false,
+      "event": {
+        "id": "fa50adcf-2bf0-5082-bd87-2afd6016c3f2",
+        "activityDateTime": "2026-10-14T01:00:00Z",
+        "tenantId": "00000000-0000-4000-8000-000000000001",
+        "initiatedBy": {
+          "user": {
+            "id": "00000000-0000-4000-8000-000000000001",
+            "userPrincipalName": "synthetic@example.invalid"
+          }
+        },
+        "targetResources": [
+          {
+            "id": "00000000-0000-4000-8000-000000000001",
+            "type": "DirectoryRole"
+          }
+        ],
+        "category": "unrelated-value",
+        "activityDisplayName": "Add app role assignment to service principal",
+        "loggedByService": "Core Directory",
+        "result": "success"
+      }
+    },
+    {
+      "name": "missing-category",
+      "expected": false,
+      "event": {
+        "id": "fa50adcf-2bf0-5082-bd87-2afd6016c3f2",
+        "activityDateTime": "2026-10-14T01:00:00Z",
+        "tenantId": "00000000-0000-4000-8000-000000000001",
+        "initiatedBy": {
+          "user": {
+            "id": "00000000-0000-4000-8000-000000000001",
+            "userPrincipalName": "synthetic@example.invalid"
+          }
+        },
+        "targetResources": [
+          {
+            "id": "00000000-0000-4000-8000-000000000001",
+            "type": "DirectoryRole"
+          }
+        ],
+        "activityDisplayName": "Add app role assignment to service principal",
+        "loggedByService": "Core Directory",
+        "result": "success"
+      }
+    },
+    {
+      "name": "wrong-activityDisplayName",
+      "expected": false,
+      "event": {
+        "id": "fa50adcf-2bf0-5082-bd87-2afd6016c3f2",
+        "activityDateTime": "2026-10-14T01:00:00Z",
+        "tenantId": "00000000-0000-4000-8000-000000000001",
+        "initiatedBy": {
+          "user": {
+            "id": "00000000-0000-4000-8000-000000000001",
+            "userPrincipalName": "synthetic@example.invalid"
+          }
+        },
+        "targetResources": [
+          {
+            "id": "00000000-0000-4000-8000-000000000001",
+            "type": "DirectoryRole"
+          }
+        ],
+        "category": "ApplicationManagement",
+        "activityDisplayName": "unrelated-value",
+        "loggedByService": "Core Directory",
+        "result": "success"
+      }
+    },
+    {
+      "name": "missing-activityDisplayName",
+      "expected": false,
+      "event": {
+        "id": "fa50adcf-2bf0-5082-bd87-2afd6016c3f2",
+        "activityDateTime": "2026-10-14T01:00:00Z",
+        "tenantId": "00000000-0000-4000-8000-000000000001",
+        "initiatedBy": {
+          "user": {
+            "id": "00000000-0000-4000-8000-000000000001",
+            "userPrincipalName": "synthetic@example.invalid"
+          }
+        },
+        "targetResources": [
+          {
+            "id": "00000000-0000-4000-8000-000000000001",
+            "type": "DirectoryRole"
+          }
+        ],
+        "category": "ApplicationManagement",
+        "loggedByService": "Core Directory",
+        "result": "success"
+      }
+    },
+    {
+      "name": "wrong-loggedByService",
+      "expected": false,
+      "event": {
+        "id": "fa50adcf-2bf0-5082-bd87-2afd6016c3f2",
+        "activityDateTime": "2026-10-14T01:00:00Z",
+        "tenantId": "00000000-0000-4000-8000-000000000001",
+        "initiatedBy": {
+          "user": {
+            "id": "00000000-0000-4000-8000-000000000001",
+            "userPrincipalName": "synthetic@example.invalid"
+          }
+        },
+        "targetResources": [
+          {
+            "id": "00000000-0000-4000-8000-000000000001",
+            "type": "DirectoryRole"
+          }
+        ],
+        "category": "ApplicationManagement",
+        "activityDisplayName": "Add app role assignment to service principal",
+        "loggedByService": "unrelated-value",
+        "result": "success"
+      }
+    },
+    {
+      "name": "missing-loggedByService",
+      "expected": false,
+      "event": {
+        "id": "fa50adcf-2bf0-5082-bd87-2afd6016c3f2",
+        "activityDateTime": "2026-10-14T01:00:00Z",
+        "tenantId": "00000000-0000-4000-8000-000000000001",
+        "initiatedBy": {
+          "user": {
+            "id": "00000000-0000-4000-8000-000000000001",
+            "userPrincipalName": "synthetic@example.invalid"
+          }
+        },
+        "targetResources": [
+          {
+            "id": "00000000-0000-4000-8000-000000000001",
+            "type": "DirectoryRole"
+          }
+        ],
+        "category": "ApplicationManagement",
+        "activityDisplayName": "Add app role assignment to service principal",
+        "result": "success"
+      }
+    },
+    {
+      "name": "wrong-result",
+      "expected": false,
+      "event": {
+        "id": "fa50adcf-2bf0-5082-bd87-2afd6016c3f2",
+        "activityDateTime": "2026-10-14T01:00:00Z",
+        "tenantId": "00000000-0000-4000-8000-000000000001",
+        "initiatedBy": {
+          "user": {
+            "id": "00000000-0000-4000-8000-000000000001",
+            "userPrincipalName": "synthetic@example.invalid"
+          }
+        },
+        "targetResources": [
+          {
+            "id": "00000000-0000-4000-8000-000000000001",
+            "type": "DirectoryRole"
+          }
+        ],
+        "category": "ApplicationManagement",
+        "activityDisplayName": "Add app role assignment to service principal",
+        "loggedByService": "Core Directory",
+        "result": "unrelated-value"
+      }
+    },
+    {
+      "name": "missing-result",
+      "expected": false,
+      "event": {
+        "id": "fa50adcf-2bf0-5082-bd87-2afd6016c3f2",
+        "activityDateTime": "2026-10-14T01:00:00Z",
+        "tenantId": "00000000-0000-4000-8000-000000000001",
+        "initiatedBy": {
+          "user": {
+            "id": "00000000-0000-4000-8000-000000000001",
+            "userPrincipalName": "synthetic@example.invalid"
+          }
+        },
+        "targetResources": [
+          {
+            "id": "00000000-0000-4000-8000-000000000001",
+            "type": "DirectoryRole"
+          }
+        ],
+        "category": "ApplicationManagement",
+        "activityDisplayName": "Add app role assignment to service principal",
+        "loggedByService": "Core Directory"
+      }
+    },
+    {
+      "name": "failed-operation",
+      "expected": false,
+      "event": {
+        "id": "fa50adcf-2bf0-5082-bd87-2afd6016c3f2",
+        "activityDateTime": "2026-10-14T01:00:00Z",
+        "tenantId": "00000000-0000-4000-8000-000000000001",
+        "initiatedBy": {
+          "user": {
+            "id": "00000000-0000-4000-8000-000000000001",
+            "userPrincipalName": "synthetic@example.invalid"
+          }
+        },
+        "targetResources": [
+          {
+            "id": "00000000-0000-4000-8000-000000000001",
+            "type": "DirectoryRole"
+          }
+        ],
+        "category": "ApplicationManagement",
+        "activityDisplayName": "Add app role assignment to service principal",
+        "loggedByService": "Core Directory",
+        "result": "failure"
+      }
+    },
+    {
+      "name": "other-provider-envelope",
+      "expected": false,
+      "event": {
+        "eventSource": "iam.amazonaws.com",
+        "eventName": "Add app role assignment to service principal"
+      }
+    }
+  ],
   "entra-conditional-access-delete": [
     {
       "name": "successful-operation",
@@ -1428,6 +1684,287 @@
       }
     }
   ],
+  "entra-consent-granted": [
+    {
+      "name": "successful-operation",
+      "expected": true,
+      "event": {
+        "id": "5bdce61c-f399-59ca-af38-d967f158c070",
+        "activityDateTime": "2026-10-14T01:00:00Z",
+        "tenantId": "00000000-0000-4000-8000-000000000001",
+        "initiatedBy": {
+          "user": {
+            "id": "00000000-0000-4000-8000-000000000001",
+            "userPrincipalName": "synthetic@example.invalid"
+          }
+        },
+        "targetResources": [
+          {
+            "id": "00000000-0000-4000-8000-000000000001",
+            "type": "Policy"
+          }
+        ],
+        "category": "ApplicationManagement",
+        "activityDisplayName": "Consent to application",
+        "loggedByService": "Core Directory",
+        "result": "success"
+      }
+    },
+    {
+      "name": "branch-Add delegated permission grant",
+      "expected": true,
+      "event": {
+        "id": "5bdce61c-f399-59ca-af38-d967f158c070",
+        "activityDateTime": "2026-10-14T01:00:00Z",
+        "tenantId": "00000000-0000-4000-8000-000000000001",
+        "initiatedBy": {
+          "user": {
+            "id": "00000000-0000-4000-8000-000000000001",
+            "userPrincipalName": "synthetic@example.invalid"
+          }
+        },
+        "targetResources": [
+          {
+            "id": "00000000-0000-4000-8000-000000000001",
+            "type": "Policy"
+          }
+        ],
+        "category": "ApplicationManagement",
+        "activityDisplayName": "Add delegated permission grant",
+        "loggedByService": "Core Directory",
+        "result": "success"
+      }
+    },
+    {
+      "name": "wrong-category",
+      "expected": false,
+      "event": {
+        "id": "5bdce61c-f399-59ca-af38-d967f158c070",
+        "activityDateTime": "2026-10-14T01:00:00Z",
+        "tenantId": "00000000-0000-4000-8000-000000000001",
+        "initiatedBy": {
+          "user": {
+            "id": "00000000-0000-4000-8000-000000000001",
+            "userPrincipalName": "synthetic@example.invalid"
+          }
+        },
+        "targetResources": [
+          {
+            "id": "00000000-0000-4000-8000-000000000001",
+            "type": "Policy"
+          }
+        ],
+        "category": "unrelated-value",
+        "activityDisplayName": "Consent to application",
+        "loggedByService": "Core Directory",
+        "result": "success"
+      }
+    },
+    {
+      "name": "missing-category",
+      "expected": false,
+      "event": {
+        "id": "5bdce61c-f399-59ca-af38-d967f158c070",
+        "activityDateTime": "2026-10-14T01:00:00Z",
+        "tenantId": "00000000-0000-4000-8000-000000000001",
+        "initiatedBy": {
+          "user": {
+            "id": "00000000-0000-4000-8000-000000000001",
+            "userPrincipalName": "synthetic@example.invalid"
+          }
+        },
+        "targetResources": [
+          {
+            "id": "00000000-0000-4000-8000-000000000001",
+            "type": "Policy"
+          }
+        ],
+        "activityDisplayName": "Consent to application",
+        "loggedByService": "Core Directory",
+        "result": "success"
+      }
+    },
+    {
+      "name": "wrong-activityDisplayName",
+      "expected": false,
+      "event": {
+        "id": "5bdce61c-f399-59ca-af38-d967f158c070",
+        "activityDateTime": "2026-10-14T01:00:00Z",
+        "tenantId": "00000000-0000-4000-8000-000000000001",
+        "initiatedBy": {
+          "user": {
+            "id": "00000000-0000-4000-8000-000000000001",
+            "userPrincipalName": "synthetic@example.invalid"
+          }
+        },
+        "targetResources": [
+          {
+            "id": "00000000-0000-4000-8000-000000000001",
+            "type": "Policy"
+          }
+        ],
+        "category": "ApplicationManagement",
+        "activityDisplayName": "unrelated-value",
+        "loggedByService": "Core Directory",
+        "result": "success"
+      }
+    },
+    {
+      "name": "missing-activityDisplayName",
+      "expected": false,
+      "event": {
+        "id": "5bdce61c-f399-59ca-af38-d967f158c070",
+        "activityDateTime": "2026-10-14T01:00:00Z",
+        "tenantId": "00000000-0000-4000-8000-000000000001",
+        "initiatedBy": {
+          "user": {
+            "id": "00000000-0000-4000-8000-000000000001",
+            "userPrincipalName": "synthetic@example.invalid"
+          }
+        },
+        "targetResources": [
+          {
+            "id": "00000000-0000-4000-8000-000000000001",
+            "type": "Policy"
+          }
+        ],
+        "category": "ApplicationManagement",
+        "loggedByService": "Core Directory",
+        "result": "success"
+      }
+    },
+    {
+      "name": "wrong-loggedByService",
+      "expected": false,
+      "event": {
+        "id": "5bdce61c-f399-59ca-af38-d967f158c070",
+        "activityDateTime": "2026-10-14T01:00:00Z",
+        "tenantId": "00000000-0000-4000-8000-000000000001",
+        "initiatedBy": {
+          "user": {
+            "id": "00000000-0000-4000-8000-000000000001",
+            "userPrincipalName": "synthetic@example.invalid"
+          }
+        },
+        "targetResources": [
+          {
+            "id": "00000000-0000-4000-8000-000000000001",
+            "type": "Policy"
+          }
+        ],
+        "category": "ApplicationManagement",
+        "activityDisplayName": "Consent to application",
+        "loggedByService": "unrelated-value",
+        "result": "success"
+      }
+    },
+    {
+      "name": "missing-loggedByService",
+      "expected": false,
+      "event": {
+        "id": "5bdce61c-f399-59ca-af38-d967f158c070",
+        "activityDateTime": "2026-10-14T01:00:00Z",
+        "tenantId": "00000000-0000-4000-8000-000000000001",
+        "initiatedBy": {
+          "user": {
+            "id": "00000000-0000-4000-8000-000000000001",
+            "userPrincipalName": "synthetic@example.invalid"
+          }
+        },
+        "targetResources": [
+          {
+            "id": "00000000-0000-4000-8000-000000000001",
+            "type": "Policy"
+          }
+        ],
+        "category": "ApplicationManagement",
+        "activityDisplayName": "Consent to application",
+        "result": "success"
+      }
+    },
+    {
+      "name": "wrong-result",
+      "expected": false,
+      "event": {
+        "id": "5bdce61c-f399-59ca-af38-d967f158c070",
+        "activityDateTime": "2026-10-14T01:00:00Z",
+        "tenantId": "00000000-0000-4000-8000-000000000001",
+        "initiatedBy": {
+          "user": {
+            "id": "00000000-0000-4000-8000-000000000001",
+            "userPrincipalName": "synthetic@example.invalid"
+          }
+        },
+        "targetResources": [
+          {
+            "id": "00000000-0000-4000-8000-000000000001",
+            "type": "Policy"
+          }
+        ],
+        "category": "ApplicationManagement",
+        "activityDisplayName": "Consent to application",
+        "loggedByService": "Core Directory",
+        "result": "unrelated-value"
+      }
+    },
+    {
+      "name": "missing-result",
+      "expected": false,
+      "event": {
+        "id": "5bdce61c-f399-59ca-af38-d967f158c070",
+        "activityDateTime": "2026-10-14T01:00:00Z",
+        "tenantId": "00000000-0000-4000-8000-000000000001",
+        "initiatedBy": {
+          "user": {
+            "id": "00000000-0000-4000-8000-000000000001",
+            "userPrincipalName": "synthetic@example.invalid"
+          }
+        },
+        "targetResources": [
+          {
+            "id": "00000000-0000-4000-8000-000000000001",
+            "type": "Policy"
+          }
+        ],
+        "category": "ApplicationManagement",
+        "activityDisplayName": "Consent to application",
+        "loggedByService": "Core Directory"
+      }
+    },
+    {
+      "name": "failed-operation",
+      "expected": false,
+      "event": {
+        "id": "5bdce61c-f399-59ca-af38-d967f158c070",
+        "activityDateTime": "2026-10-14T01:00:00Z",
+        "tenantId": "00000000-0000-4000-8000-000000000001",
+        "initiatedBy": {
+          "user": {
+            "id": "00000000-0000-4000-8000-000000000001",
+            "userPrincipalName": "synthetic@example.invalid"
+          }
+        },
+        "targetResources": [
+          {
+            "id": "00000000-0000-4000-8000-000000000001",
+            "type": "Policy"
+          }
+        ],
+        "category": "ApplicationManagement",
+        "activityDisplayName": "Consent to application",
+        "loggedByService": "Core Directory",
+        "result": "failure"
+      }
+    },
+    {
+      "name": "other-provider-envelope",
+      "expected": false,
+      "event": {
+        "eventSource": "iam.amazonaws.com",
+        "eventName": "Consent to application"
+      }
+    }
+  ],
   "entra-role-member": [
     {
       "name": "successful-operation",
@@ -1681,6 +2218,262 @@
       "event": {
         "eventSource": "iam.amazonaws.com",
         "eventName": "Add member to role"
+      }
+    }
+  ],
+  "entra-user-created": [
+    {
+      "name": "successful-operation",
+      "expected": true,
+      "event": {
+        "id": "bc9d4caa-6331-5347-8f2b-255319bb0f1c",
+        "activityDateTime": "2026-10-14T01:00:00Z",
+        "tenantId": "00000000-0000-4000-8000-000000000001",
+        "initiatedBy": {
+          "user": {
+            "id": "00000000-0000-4000-8000-000000000001",
+            "userPrincipalName": "synthetic@example.invalid"
+          }
+        },
+        "targetResources": [
+          {
+            "id": "00000000-0000-4000-8000-000000000001",
+            "type": "Policy"
+          }
+        ],
+        "category": "UserManagement",
+        "activityDisplayName": "Add user",
+        "loggedByService": "Core Directory",
+        "result": "success"
+      }
+    },
+    {
+      "name": "wrong-category",
+      "expected": false,
+      "event": {
+        "id": "bc9d4caa-6331-5347-8f2b-255319bb0f1c",
+        "activityDateTime": "2026-10-14T01:00:00Z",
+        "tenantId": "00000000-0000-4000-8000-000000000001",
+        "initiatedBy": {
+          "user": {
+            "id": "00000000-0000-4000-8000-000000000001",
+            "userPrincipalName": "synthetic@example.invalid"
+          }
+        },
+        "targetResources": [
+          {
+            "id": "00000000-0000-4000-8000-000000000001",
+            "type": "Policy"
+          }
+        ],
+        "category": "unrelated-value",
+        "activityDisplayName": "Add user",
+        "loggedByService": "Core Directory",
+        "result": "success"
+      }
+    },
+    {
+      "name": "missing-category",
+      "expected": false,
+      "event": {
+        "id": "bc9d4caa-6331-5347-8f2b-255319bb0f1c",
+        "activityDateTime": "2026-10-14T01:00:00Z",
+        "tenantId": "00000000-0000-4000-8000-000000000001",
+        "initiatedBy": {
+          "user": {
+            "id": "00000000-0000-4000-8000-000000000001",
+            "userPrincipalName": "synthetic@example.invalid"
+          }
+        },
+        "targetResources": [
+          {
+            "id": "00000000-0000-4000-8000-000000000001",
+            "type": "Policy"
+          }
+        ],
+        "activityDisplayName": "Add user",
+        "loggedByService": "Core Directory",
+        "result": "success"
+      }
+    },
+    {
+      "name": "wrong-activityDisplayName",
+      "expected": false,
+      "event": {
+        "id": "bc9d4caa-6331-5347-8f2b-255319bb0f1c",
+        "activityDateTime": "2026-10-14T01:00:00Z",
+        "tenantId": "00000000-0000-4000-8000-000000000001",
+        "initiatedBy": {
+          "user": {
+            "id": "00000000-0000-4000-8000-000000000001",
+            "userPrincipalName": "synthetic@example.invalid"
+          }
+        },
+        "targetResources": [
+          {
+            "id": "00000000-0000-4000-8000-000000000001",
+            "type": "Policy"
+          }
+        ],
+        "category": "UserManagement",
+        "activityDisplayName": "unrelated-value",
+        "loggedByService": "Core Directory",
+        "result": "success"
+      }
+    },
+    {
+      "name": "missing-activityDisplayName",
+      "expected": false,
+      "event": {
+        "id": "bc9d4caa-6331-5347-8f2b-255319bb0f1c",
+        "activityDateTime": "2026-10-14T01:00:00Z",
+        "tenantId": "00000000-0000-4000-8000-000000000001",
+        "initiatedBy": {
+          "user": {
+            "id": "00000000-0000-4000-8000-000000000001",
+            "userPrincipalName": "synthetic@example.invalid"
+          }
+        },
+        "targetResources": [
+          {
+            "id": "00000000-0000-4000-8000-000000000001",
+            "type": "Policy"
+          }
+        ],
+        "category": "UserManagement",
+        "loggedByService": "Core Directory",
+        "result": "success"
+      }
+    },
+    {
+      "name": "wrong-loggedByService",
+      "expected": false,
+      "event": {
+        "id": "bc9d4caa-6331-5347-8f2b-255319bb0f1c",
+        "activityDateTime": "2026-10-14T01:00:00Z",
+        "tenantId": "00000000-0000-4000-8000-000000000001",
+        "initiatedBy": {
+          "user": {
+            "id": "00000000-0000-4000-8000-000000000001",
+            "userPrincipalName": "synthetic@example.invalid"
+          }
+        },
+        "targetResources": [
+          {
+            "id": "00000000-0000-4000-8000-000000000001",
+            "type": "Policy"
+          }
+        ],
+        "category": "UserManagement",
+        "activityDisplayName": "Add user",
+        "loggedByService": "unrelated-value",
+        "result": "success"
+      }
+    },
+    {
+      "name": "missing-loggedByService",
+      "expected": false,
+      "event": {
+        "id": "bc9d4caa-6331-5347-8f2b-255319bb0f1c",
+        "activityDateTime": "2026-10-14T01:00:00Z",
+        "tenantId": "00000000-0000-4000-8000-000000000001",
+        "initiatedBy": {
+          "user": {
+            "id": "00000000-0000-4000-8000-000000000001",
+            "userPrincipalName": "synthetic@example.invalid"
+          }
+        },
+        "targetResources": [
+          {
+            "id": "00000000-0000-4000-8000-000000000001",
+            "type": "Policy"
+          }
+        ],
+        "category": "UserManagement",
+        "activityDisplayName": "Add user",
+        "result": "success"
+      }
+    },
+    {
+      "name": "wrong-result",
+      "expected": false,
+      "event": {
+        "id": "bc9d4caa-6331-5347-8f2b-255319bb0f1c",
+        "activityDateTime": "2026-10-14T01:00:00Z",
+        "tenantId": "00000000-0000-4000-8000-000000000001",
+        "initiatedBy": {
+          "user": {
+            "id": "00000000-0000-4000-8000-000000000001",
+            "userPrincipalName": "synthetic@example.invalid"
+          }
+        },
+        "targetResources": [
+          {
+            "id": "00000000-0000-4000-8000-000000000001",
+            "type": "Policy"
+          }
+        ],
+        "category": "UserManagement",
+        "activityDisplayName": "Add user",
+        "loggedByService": "Core Directory",
+        "result": "unrelated-value"
+      }
+    },
+    {
+      "name": "missing-result",
+      "expected": false,
+      "event": {
+        "id": "bc9d4caa-6331-5347-8f2b-255319bb0f1c",
+        "activityDateTime": "2026-10-14T01:00:00Z",
+        "tenantId": "00000000-0000-4000-8000-000000000001",
+        "initiatedBy": {
+          "user": {
+            "id": "00000000-0000-4000-8000-000000000001",
+            "userPrincipalName": "synthetic@example.invalid"
+          }
+        },
+        "targetResources": [
+          {
+            "id": "00000000-0000-4000-8000-000000000001",
+            "type": "Policy"
+          }
+        ],
+        "category": "UserManagement",
+        "activityDisplayName": "Add user",
+        "loggedByService": "Core Directory"
+      }
+    },
+    {
+      "name": "failed-operation",
+      "expected": false,
+      "event": {
+        "id": "bc9d4caa-6331-5347-8f2b-255319bb0f1c",
+        "activityDateTime": "2026-10-14T01:00:00Z",
+        "tenantId": "00000000-0000-4000-8000-000000000001",
+        "initiatedBy": {
+          "user": {
+            "id": "00000000-0000-4000-8000-000000000001",
+            "userPrincipalName": "synthetic@example.invalid"
+          }
+        },
+        "targetResources": [
+          {
+            "id": "00000000-0000-4000-8000-000000000001",
+            "type": "Policy"
+          }
+        ],
+        "category": "UserManagement",
+        "activityDisplayName": "Add user",
+        "loggedByService": "Core Directory",
+        "result": "failure"
+      }
+    },
+    {
+      "name": "other-provider-envelope",
+      "expected": false,
+      "event": {
+        "eventSource": "iam.amazonaws.com",
+        "eventName": "Add user"
       }
     }
   ]

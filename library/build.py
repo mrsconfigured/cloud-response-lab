@@ -14,12 +14,14 @@ from sigma.backends.elasticsearch import LuceneBackend
 from sigma.conditions import ConditionAND, ConditionOR, ConditionNOT, ConditionFieldEqualsValueExpression
 from sigma.types import SigmaString, SigmaNull
 from lab import field
+from core import packs as pk
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / 'library/generated'
 ACCOUNT = '111111111111'
 TENANT = '00000000-0000-4000-8000-000000000001'
 STAMP = '2026-10-14T01:00:00Z'
+CFG = pk.config(ROOT)
 
 
 def evaluate(node, event):
@@ -45,11 +47,22 @@ def put(event, key, value):
     event[parts[-1]] = value
 
 
+def rule_paths():
+    for pack in pk.packs(ROOT):
+        yield from sorted(pack['detections_dir'].glob('*.yml'))
+
+
+def documents_full():
+    for pack in pk.packs(ROOT):
+        for path in sorted(pack['detections_dir'].glob('*.yml')):
+            raw = yaml.safe_load(path.read_text())
+            collection = SigmaCollection.from_yaml(path.read_text())
+            yield pack, path.stem, raw, collection
+
+
 def documents():
-    for path in sorted((ROOT / 'detections/sigma').glob('*.yml')):
-        raw = yaml.safe_load(path.read_text())
-        collection = SigmaCollection.from_yaml(path.read_text())
-        yield path.stem, raw, collection
+    for _, slug, raw, collection in documents_full():
+        yield slug, raw, collection
 
 
 def fixtures(slug, raw):
@@ -96,7 +109,7 @@ def build():
     exports, matrix, all_cases, contracts = [], [], {}, []
     techniques = {}
     ids = set()
-    for slug, raw, collection in documents():
+    for pack, slug, raw, collection in documents_full():
         if raw['id'] in ids: raise ValueError('duplicate Sigma rule id')
         ids.add(raw['id'])
         query, = LuceneBackend().convert(collection)
@@ -105,13 +118,15 @@ def build():
         for case in cases:
             if evaluate(ast, case['event']) != case['expected']:
                 raise ValueError(slug + ': ' + case['name'])
-        provider = 'aws' if raw['logsource']['product'] == 'aws' else 'entra'
-        index = 'logs-cloud-response-lab-library-' + provider
+        provider = pack['provider']
+        index = pack['index']
+        severity = CFG['severity_map'][raw.get('level', 'high')]
         tech = next(t.split('attack.')[1].upper() for t in raw['tags'] if t.startswith('attack.t1'))
         exports.append({'rule_id': raw['id'], 'name': raw['title'], 'description': raw['description'],
                         'type': 'query', 'language': 'lucene', 'query': query, 'index': [index],
-                        'enabled': False, 'interval': '1m', 'from': 'now-10m', 'risk_score': 73,
-                        'severity': 'high', 'actions': [], 'tags': raw['tags'] + ['synthetic-library']})
+                        'enabled': slug in pack['enabled_rules'], 'interval': CFG['rule_defaults']['interval'],
+                        'from': CFG['rule_defaults']['from'], 'risk_score': CFG['risk_score_map'][severity],
+                        'severity': severity, 'actions': [], 'tags': raw['tags'] + ['lab-library']})
         row = {'slug': slug, 'id': raw['id'], 'provider': provider, 'logsource': raw['logsource'],
                'technique': tech, 'positive': sum(c['expected'] for c in cases),
                'negative': sum(not c['expected'] for c in cases), 'query_engine_live': False}
@@ -131,7 +146,7 @@ def build():
               'compiler.json': {'compiler': 'pySigma', 'version': version('pysigma'),
                                 'backend_version': version('pysigma-backend-elasticsearch'),
                                 'test_engine': 'bounded pySigma parsed AST; NOT Elasticsearch',
-                                'rule_count': len(exports), 'source_sha256': {p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted((ROOT / 'detections/sigma').glob('*.yml'))}}}
+                                'rule_count': len(exports), 'source_sha256': {p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in rule_paths()}}}
     # Explicit mappings avoid text analyzer false parity; arrays are not queried here.
     fields = {}
     for _, raw, _ in documents():
@@ -142,8 +157,45 @@ def build():
     return result
 
 
+def pack_layers():
+    # One ATT&CK Navigator layer per pack, derived only from that pack's own rule files.
+    names = pk.attack_names(ROOT)
+    layers = {}
+    for pack in pk.packs(ROOT):
+        techs = {}
+
+        def add(path, kind):
+            raw = yaml.safe_load(path.read_text())
+            tech = next(t.split('attack.')[1].upper() for t in raw['tags'] if t.startswith('attack.t1'))
+            techs.setdefault(tech, {'enabled': [], 'disabled': [], 'fixture_only': []})[kind].append(path.stem)
+
+        for path in sorted(pack['detections_dir'].glob('*.yml')):
+            add(path, 'enabled' if path.stem in pack['enabled_rules'] else 'disabled')
+        signin = pack['detections_dir'] / 'signin'
+        if signin.is_dir():
+            for path in sorted(signin.glob('*.yml')):
+                add(path, 'fixture_only')
+        rows = []
+        for tech, groups in sorted(techs.items()):
+            if groups['enabled']:
+                color, note = '#31a354', 'enabled on real data: ' + ', '.join(groups['enabled'])
+            elif groups['disabled']:
+                color, note = '#fdae6b', 'rule exists but disabled: ' + ', '.join(groups['disabled'])
+            else:
+                color, note = '#bdbdbd', 'FIXTURE ONLY (' + pack.get('fixture_only_reason', 'no live data source') + '): ' + ', '.join(groups['fixture_only'])
+            rows.append({'techniqueID': tech, 'score': len(groups['enabled']), 'color': color, 'enabled': True,
+                         'comment': names.get(tech, {}).get('name', tech) + ' | ' + note})
+        layers[pack['name']] = {'name': pack['log_source'] + ' pack', 'domain': 'enterprise-attack',
+                                'versions': {'layer': '4.5', 'navigator': '5.1.0'},
+                                'description': 'Green = enabled rule on a live source. Orange = rule disabled. Grey = fixture only. Mappings are hypotheses, not a coverage percentage.',
+                                'techniques': rows}
+    return layers
+
+
 def main():
     OUT.mkdir(parents=True, exist_ok=True)
+    for name, layer in pack_layers().items():
+        (ROOT / 'packs' / name / 'attack-layer.json').write_text(json.dumps(layer, indent=2) + chr(10))
     result = build()
     for name, value in result.items():
         (OUT / name).write_text(json.dumps(value, indent=2) + chr(10))

@@ -1,0 +1,107 @@
+{
+  "positive": [
+    {
+      "name": "real-shape CreateAccessKey",
+      "event": {
+        "eventVersion": "1.11",
+        "eventTime": "2026-10-14T19:32:04Z",
+        "awsRegion": "us-east-1",
+        "sourceIPAddress": "203.0.113.10",
+        "userAgent": "lab-test-agent",
+        "recipientAccountId": "111111111111",
+        "readOnly": false,
+        "managementEvent": true,
+        "eventType": "AwsApiCall",
+        "eventID": "00000000-0000-4000-8000-000000000001",
+        "userIdentity": {
+          "type": "IAMUser",
+          "userName": "lab-operator",
+          "accountId": "111111111111"
+        },
+        "eventSource": "iam.amazonaws.com",
+        "eventName": "CreateAccessKey",
+        "requestParameters": {
+          "userName": "example-user"
+        },
+        "responseElements": {
+          "accessKey": {
+            "userName": "example-user",
+            "status": "Active"
+          }
+        }
+      }
+    }
+  ],
+  "negative": [
+    {
+      "name": "denied attempt",
+      "event": {
+        "eventVersion": "1.11",
+        "eventTime": "2026-10-14T19:32:04Z",
+        "awsRegion": "us-east-1",
+        "sourceIPAddress": "203.0.113.10",
+        "userAgent": "lab-test-agent",
+        "recipientAccountId": "111111111111",
+        "readOnly": false,
+        "managementEvent": true,
+        "eventType": "AwsApiCall",
+        "eventID": "00000000-0000-4000-8000-000000000002",
+        "userIdentity": {
+          "type": "IAMUser",
+          "userName": "lab-operator",
+          "accountId": "111111111111"
+        },
+        "eventSource": "iam.amazonaws.com",
+        "eventName": "CreateAccessKey",
+        "errorCode": "AccessDenied",
+        "requestParameters": {
+          "userName": "example-user"
+        }
+      }
+    },
+    {
+      "name": "neighbour: ListAccessKeys",
+      "event": {
+        "eventVersion": "1.11",
+        "eventTime": "2026-10-14T19:32:04Z",
+        "awsRegion": "us-east-1",
+        "sourceIPAddress": "203.0.113.10",
+        "userAgent": "lab-test-agent",
+        "recipientAccountId": "111111111111",
+        "readOnly": true,
+        "managementEvent": true,
+        "eventType": "AwsApiCall",
+        "eventID": "00000000-0000-4000-8000-000000000003",
+        "userIdentity": {
+          "type": "IAMUser",
+          "userName": "lab-operator",
+          "accountId": "111111111111"
+        },
+        "eventSource": "iam.amazonaws.com",
+        "eventName": "ListAccessKeys"
+      }
+    },
+    {
+      "name": "neighbour: sts GetCallerIdentity",
+      "event": {
+        "eventVersion": "1.11",
+        "eventTime": "2026-10-14T19:32:04Z",
+        "awsRegion": "us-east-1",
+        "sourceIPAddress": "203.0.113.10",
+        "userAgent": "lab-test-agent",
+        "recipientAccountId": "111111111111",
+        "readOnly": true,
+        "managementEvent": true,
+        "eventType": "AwsApiCall",
+        "eventID": "00000000-0000-4000-8000-000000000004",
+        "userIdentity": {
+          "type": "IAMUser",
+          "userName": "lab-operator",
+          "accountId": "111111111111"
+        },
+        "eventSource": "sts.amazonaws.com",
+        "eventName": "GetCallerIdentity"
+      }
+    }
+  ]
+}

@@ -1,0 +1,83 @@
+{
+  "schema_version": 1,
+  "id": "contain-iam-user",
+  "version": "1.0.0",
+  "pack": "aws",
+  "owner_lane": "response",
+  "title": "Contain IAM user (dry-run)",
+  "trigger": {
+    "rule_ids": [
+      "8a7d441b-870b-4fce-bac4-000000000003",
+      "965a1068-c2bf-4ea5-b1d0-000000000002"
+    ],
+    "event": {
+      "all_of": [
+        {
+          "path": "eventSource",
+          "equals": "iam.amazonaws.com"
+        }
+      ],
+      "none_of": [
+        {
+          "path": "errorCode",
+          "exists": true
+        }
+      ]
+    }
+  },
+  "benign": {
+    "any_of": [
+      {
+        "path": "userIdentity.type",
+        "equals": "AWSService",
+        "why": "initiated by an AWS service, not a person or key"
+      }
+    ]
+  },
+  "protected_targets": [
+    "break-glass-admin"
+  ],
+  "target": {
+    "path": "requestParameters.userName",
+    "label": "IAM user"
+  },
+  "approval": {
+    "required": true,
+    "approver_roles": [
+      "detection-owner",
+      "response-owner"
+    ],
+    "prompt": "Will deactivate every access key of IAM user {target} and attach an inline DenyAll policy to it."
+  },
+  "steps": [
+    {
+      "id": "deactivate_access_keys",
+      "action": "iam:UpdateAccessKey",
+      "params": {
+        "UserName": "{target}",
+        "Status": "Inactive"
+      }
+    },
+    {
+      "id": "attach_deny_all",
+      "action": "iam:PutUserPolicy",
+      "params": {
+        "UserName": "{target}",
+        "PolicyName": "lab-contain-deny-all"
+      }
+    }
+  ],
+  "mode": "dry_run",
+  "live": {
+    "supported": false,
+    "required_permissions": [
+      "iam:ListAccessKeys",
+      "iam:UpdateAccessKey",
+      "iam:PutUserPolicy"
+    ],
+    "note": "The response identity holds no destructive IAM permission. Flip to live only after granting and reviewing them."
+  },
+  "audit": {
+    "index": "lab-response-audit"
+  }
+}

@@ -1,0 +1,76 @@
+{
+  "positive": [
+    {
+      "name": "StopLogging",
+      "event": {
+        "eventVersion": "1.11",
+        "eventTime": "2026-10-14T19:32:04Z",
+        "awsRegion": "us-east-1",
+        "sourceIPAddress": "203.0.113.10",
+        "userAgent": "lab-test-agent",
+        "recipientAccountId": "111111111111",
+        "readOnly": false,
+        "managementEvent": true,
+        "eventType": "AwsApiCall",
+        "eventID": "00000000-0000-4000-8000-000000000014",
+        "userIdentity": {
+          "type": "IAMUser",
+          "userName": "lab-operator",
+          "accountId": "111111111111"
+        },
+        "eventSource": "cloudtrail.amazonaws.com",
+        "eventName": "StopLogging",
+        "requestParameters": {
+          "name": "example-trail"
+        }
+      }
+    }
+  ],
+  "negative": [
+    {
+      "name": "neighbour: StartLogging",
+      "event": {
+        "eventVersion": "1.11",
+        "eventTime": "2026-10-14T19:32:04Z",
+        "awsRegion": "us-east-1",
+        "sourceIPAddress": "203.0.113.10",
+        "userAgent": "lab-test-agent",
+        "recipientAccountId": "111111111111",
+        "readOnly": false,
+        "managementEvent": true,
+        "eventType": "AwsApiCall",
+        "eventID": "00000000-0000-4000-8000-000000000015",
+        "userIdentity": {
+          "type": "IAMUser",
+          "userName": "lab-operator",
+          "accountId": "111111111111"
+        },
+        "eventSource": "cloudtrail.amazonaws.com",
+        "eventName": "StartLogging"
+      }
+    },
+    {
+      "name": "denied StopLogging",
+      "event": {
+        "eventVersion": "1.11",
+        "eventTime": "2026-10-14T19:32:04Z",
+        "awsRegion": "us-east-1",
+        "sourceIPAddress": "203.0.113.10",
+        "userAgent": "lab-test-agent",
+        "recipientAccountId": "111111111111",
+        "readOnly": false,
+        "managementEvent": true,
+        "eventType": "AwsApiCall",
+        "eventID": "00000000-0000-4000-8000-000000000016",
+        "userIdentity": {
+          "type": "IAMUser",
+          "userName": "lab-operator",
+          "accountId": "111111111111"
+        },
+        "eventSource": "cloudtrail.amazonaws.com",
+        "eventName": "StopLogging",
+        "errorCode": "AccessDenied"
+      }
+    }
+  ]
+}

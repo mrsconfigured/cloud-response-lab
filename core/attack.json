@@ -1,0 +1,63 @@
+{
+  "T1098.001": {
+    "name": "Additional Cloud Credentials",
+    "tactics": [
+      "persistence",
+      "privilege-escalation"
+    ]
+  },
+  "T1098.003": {
+    "name": "Additional Cloud Roles",
+    "tactics": [
+      "persistence",
+      "privilege-escalation"
+    ]
+  },
+  "T1562.008": {
+    "name": "Disable or Modify Cloud Logs",
+    "tactics": [
+      "defense-evasion"
+    ]
+  },
+  "T1078.004": {
+    "name": "Cloud Accounts",
+    "tactics": [
+      "initial-access",
+      "persistence",
+      "privilege-escalation",
+      "defense-evasion"
+    ]
+  },
+  "T1556.009": {
+    "name": "Conditional Access Policies",
+    "tactics": [
+      "credential-access",
+      "defense-evasion",
+      "persistence"
+    ]
+  },
+  "T1528": {
+    "name": "Steal Application Access Token",
+    "tactics": [
+      "credential-access"
+    ]
+  },
+  "T1136.003": {
+    "name": "Create Account: Cloud Account",
+    "tactics": [
+      "persistence"
+    ]
+  },
+  "T1110": {
+    "name": "Brute Force",
+    "tactics": [
+      "credential-access"
+    ]
+  },
+  "T1621": {
+    "name": "Multi-Factor Authentication Request Generation",
+    "tactics": [
+      "credential-access"
+    ]
+  }
+}

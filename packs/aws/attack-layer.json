@@ -1,0 +1,39 @@
+{
+  "name": "AWS CloudTrail pack",
+  "domain": "enterprise-attack",
+  "versions": {
+    "layer": "4.5",
+    "navigator": "5.1.0"
+  },
+  "description": "Green = enabled rule on a live source. Orange = rule disabled. Grey = fixture only. Mappings are hypotheses, not a coverage percentage.",
+  "techniques": [
+    {
+      "techniqueID": "T1078.004",
+      "score": 1,
+      "color": "#31a354",
+      "enabled": true,
+      "comment": "Cloud Accounts | enabled on real data: aws-console-no-mfa"
+    },
+    {
+      "techniqueID": "T1098.001",
+      "score": 1,
+      "color": "#31a354",
+      "enabled": true,
+      "comment": "Additional Cloud Credentials | enabled on real data: aws-access-key-create"
+    },
+    {
+      "techniqueID": "T1098.003",
+      "score": 1,
+      "color": "#31a354",
+      "enabled": true,
+      "comment": "Additional Cloud Roles | enabled on real data: aws-admin-attachment"
+    },
+    {
+      "techniqueID": "T1562.008",
+      "score": 2,
+      "color": "#31a354",
+      "enabled": true,
+      "comment": "Disable or Modify Cloud Logs | enabled on real data: aws-cloudtrail-delete, aws-cloudtrail-stop"
+    }
+  ]
+}

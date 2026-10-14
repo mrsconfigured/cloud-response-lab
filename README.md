@@ -1,30 +1,41 @@
 # cloud-response-lab
 
-Canonical home: **mrsconfigured/cloud-response-lab**. 1xLoZec owns detections; Owner B (mrsconfigured) owns response. This local increment is not published and does not prove GitHub branch protection.
+Canonical home: **mrsconfigured/cloud-response-lab**. 1xLoZec owns detections; mrsconfigured owns response. CODEOWNERS records that split; it does not enforce review, and branch protection is not enabled.
 
-**Partially built and proven.** A bounded live synthetic V1 run proved three Elastic hits, five negative exclusions, three scheduled alerts, direct dry-run response and Kibana dashboard import/export. The stack is now stopped. Shuffle execution, authenticated screenshot, tailnet access, hosted CI and reviewed publication are not claimed. [Evidence narrative and limitations](docs/PORTFOLIO.md).
+A two-person cloud detection and response lab built on real logs from personal sandbox accounts. Detections and response playbooks are code, organised in **packs** (one per log source), and a Discord **console** runs the lab: alert cards, approval-gated dry-run containment, hunts, a daily scorecard. Everything that can change an account is **dry-run only**.
 
-## Build without cloud accounts
+**Status: working end to end for AWS CloudTrail and Entra directory audit; partial overall.** Five of eleven live rules have matched real events, the rest are fixture-tested. Sign-in rules need Entra ID P1/P2 and are fixture-only. Read [docs/PORTFOLIO.md](docs/PORTFOLIO.md) for exactly what is proven and what is not.
+
+## Layout
+
+| Path | What |
+|---|---|
+| `packs/aws/`, `packs/entra/` | One pack per log source: `detections/`, `playbooks/`, `tests/`, `attack-layer.json`, `README.md`, `pack.json` |
+| `core/` | Pack-agnostic platform: console, approval gate, playbook runner, CI report, metrics, deploy and drift check |
+| `library/` | Compiles every pack's Sigma rules with pySigma into disabled/enabled Elastic rules, fixtures and a Navigator layer |
+| `tests/`, `lab.py`, `v1/`, `response/`, `detections/*.json` | The earlier single-rule prototype and its tests. Kept and still tested; new work goes in packs |
+
+## Build and test without cloud accounts
 
     python3 -m venv .venv
     .venv/bin/python -m pip install -r requirements-v1.lock
     .venv/bin/python -m v1.build
-    .venv/bin/python -m library.build
+    .venv/bin/python -m library.build         # also regenerates each pack's ATT&CK layer
+    .venv/bin/python -m core.shuffle_export   # Shuffle workflows are generated from the playbook files
     .venv/bin/python scripts/validate.py
-    .venv/bin/python -m unittest discover -s tests -v
-    .venv/bin/python -O -m unittest discover -s tests -v
+    .venv/bin/python -m unittest discover -s tests
+    .venv/bin/python -m unittest discover -s packs -t .    # detection tests and playbook UAT for every pack
+    .venv/bin/python -m unittest discover -s core -t .     # console, approval gate, pack structure
 
-First dependency installation requires network; replay is offline. Eight genuine Sigma rules (5 AWS + 3 Entra), ten positive / 71 negative AST cases, provider-separated disabled exports, eight response contracts and five ATT&CK technique hypotheses. New library rules are **not live-query-proven**. Root JSON detections are three historical prototypes, not additional Sigma rules.
+CI runs all of the above, plus an optimized (`-O`) pass, and fails if any generated file is out of date.
 
+- [Portfolio write-up: what ran, what is proven, what is not](docs/PORTFOLIO.md)
+- [Operating the console](docs/CONSOLE.md)
+- [AWS pack](packs/aws/README.md) and [Entra pack](packs/entra/README.md)
 - [Build-along: 12 weeks, source distinctions, start/stop/cost controls](docs/BUILD-GUIDE.md)
-- [Exact generated detection matrix](library/generated/matrix.json)
-- [ATT&CK Navigator layer](library/generated/navigator.json)
-- [Terraform plan-only staging, not full provisioning](infra/terraform/README.md)
-- [Atomic + Stratus synthetic exercise mappings](attacks/EXERCISES.md)
+- [Terraform plan-only staging, not provisioning](infra/terraform/README.md)
 - [Governance](docs/GOVERNANCE.md) and [upstream provenance](docs/UPSTREAM.md)
 
 ## Boundaries
 
-No work account, new spend, real attack or cloud provisioning. Existing V1 code/tests and evidence are retained. New response helpers return proposals only, never cloud actions. A Docker internal network alone does not isolate the host gateway: **do not restart the stopped stack until persistent isolation and stop-before-rollback lifecycle are independently reviewed.**
-
-All earlier BUILD/INTEGRATION/V1 reports are historical snapshots; current component truth is the portfolio narrative above. Security drafts still require independent review before publication or activation; CODEOWNERS alone does not enforce review. AWS/Azure account work remains on STOP.
+No work account, no unapproved spend, no live containment. The response identity holds no destructive permission and the Azure app holds read-only Graph scopes, so every playbook is dry-run and says so on every result. Earlier BUILD, INTEGRATION and V1 reports are historical snapshots; the portfolio document is the current truth.

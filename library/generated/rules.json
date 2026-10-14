@@ -9,16 +9,16 @@
     "index": [
       "logs-cloud-response-lab-library-aws"
     ],
-    "enabled": false,
+    "enabled": true,
     "interval": "1m",
-    "from": "now-10m",
+    "from": "now-30m",
     "risk_score": 73,
     "severity": "high",
     "actions": [],
     "tags": [
       "attack.persistence",
       "attack.t1098.001",
-      "synthetic-library"
+      "lab-library"
     ]
   },
   {
@@ -31,16 +31,16 @@
     "index": [
       "logs-cloud-response-lab-library-aws"
     ],
-    "enabled": false,
+    "enabled": true,
     "interval": "1m",
-    "from": "now-10m",
+    "from": "now-30m",
     "risk_score": 73,
     "severity": "high",
     "actions": [],
     "tags": [
       "attack.privilege-escalation",
       "attack.t1098.003",
-      "synthetic-library"
+      "lab-library"
     ]
   },
   {
@@ -53,16 +53,16 @@
     "index": [
       "logs-cloud-response-lab-library-aws"
     ],
-    "enabled": false,
+    "enabled": true,
     "interval": "1m",
-    "from": "now-10m",
+    "from": "now-30m",
     "risk_score": 73,
     "severity": "high",
     "actions": [],
     "tags": [
       "attack.defense-evasion",
       "attack.t1562.008",
-      "synthetic-library"
+      "lab-library"
     ]
   },
   {
@@ -75,16 +75,16 @@
     "index": [
       "logs-cloud-response-lab-library-aws"
     ],
-    "enabled": false,
+    "enabled": true,
     "interval": "1m",
-    "from": "now-10m",
+    "from": "now-30m",
     "risk_score": 73,
     "severity": "high",
     "actions": [],
     "tags": [
       "attack.defense-evasion",
       "attack.t1562.008",
-      "synthetic-library"
+      "lab-library"
     ]
   },
   {
@@ -97,16 +97,16 @@
     "index": [
       "logs-cloud-response-lab-library-aws"
     ],
-    "enabled": false,
+    "enabled": true,
     "interval": "1m",
-    "from": "now-10m",
+    "from": "now-30m",
     "risk_score": 73,
     "severity": "high",
     "actions": [],
     "tags": [
       "attack.initial-access",
       "attack.t1078.004",
-      "synthetic-library"
+      "lab-library"
     ]
   },
   {
@@ -119,16 +119,38 @@
     "index": [
       "logs-cloud-response-lab-library-entra"
     ],
-    "enabled": false,
+    "enabled": true,
     "interval": "1m",
-    "from": "now-10m",
+    "from": "now-30m",
     "risk_score": 73,
     "severity": "high",
     "actions": [],
     "tags": [
       "attack.persistence",
       "attack.t1098.001",
-      "synthetic-library"
+      "lab-library"
+    ]
+  },
+  {
+    "rule_id": "8a7d441b-870b-4fce-bac4-000000000008",
+    "name": "Entra App Role Assigned To Service Principal",
+    "description": "Successful app role assignment to a service principal in directory audit logs. Behavioral signal for privilege escalation through an application identity, not proof of malicious intent.",
+    "type": "query",
+    "language": "lucene",
+    "query": "category:ApplicationManagement AND activityDisplayName:\"Add app role assignment to service principal\" AND loggedByService:\"Core Directory\" AND result:success",
+    "index": [
+      "logs-cloud-response-lab-library-entra"
+    ],
+    "enabled": true,
+    "interval": "1m",
+    "from": "now-30m",
+    "risk_score": 47,
+    "severity": "medium",
+    "actions": [],
+    "tags": [
+      "attack.privilege-escalation",
+      "attack.t1098.003",
+      "lab-library"
     ]
   },
   {
@@ -141,16 +163,38 @@
     "index": [
       "logs-cloud-response-lab-library-entra"
     ],
-    "enabled": false,
+    "enabled": true,
     "interval": "1m",
-    "from": "now-10m",
+    "from": "now-30m",
     "risk_score": 73,
     "severity": "high",
     "actions": [],
     "tags": [
       "attack.defense-evasion",
       "attack.t1556.009",
-      "synthetic-library"
+      "lab-library"
+    ]
+  },
+  {
+    "rule_id": "8a7d441b-870b-4fce-bac4-000000000009",
+    "name": "Entra Application Consent Or Delegated Permission Granted",
+    "description": "Successful user or admin consent to an application, or a delegated permission grant, in directory audit logs. Illicit consent is a known token-theft path; treat as a signal and verify the app and the permissions.",
+    "type": "query",
+    "language": "lucene",
+    "query": "category:ApplicationManagement AND (activityDisplayName:(\"Consent to application\" OR \"Add delegated permission grant\")) AND loggedByService:\"Core Directory\" AND result:success",
+    "index": [
+      "logs-cloud-response-lab-library-entra"
+    ],
+    "enabled": true,
+    "interval": "1m",
+    "from": "now-30m",
+    "risk_score": 73,
+    "severity": "high",
+    "actions": [],
+    "tags": [
+      "attack.credential-access",
+      "attack.t1528",
+      "lab-library"
     ]
   },
   {
@@ -163,16 +207,38 @@
     "index": [
       "logs-cloud-response-lab-library-entra"
     ],
-    "enabled": false,
+    "enabled": true,
     "interval": "1m",
-    "from": "now-10m",
+    "from": "now-30m",
     "risk_score": 73,
     "severity": "high",
     "actions": [],
     "tags": [
       "attack.privilege-escalation",
       "attack.t1098.003",
-      "synthetic-library"
+      "lab-library"
+    ]
+  },
+  {
+    "rule_id": "8a7d441b-870b-4fce-bac4-00000000000a",
+    "name": "Entra New User Account Created",
+    "description": "Successful creation of a new user in the directory. Combine with a role assignment to spot a new administrator account; on its own it is a low-fidelity signal.",
+    "type": "query",
+    "language": "lucene",
+    "query": "category:UserManagement AND activityDisplayName:\"Add user\" AND loggedByService:\"Core Directory\" AND result:success",
+    "index": [
+      "logs-cloud-response-lab-library-entra"
+    ],
+    "enabled": true,
+    "interval": "1m",
+    "from": "now-30m",
+    "risk_score": 47,
+    "severity": "medium",
+    "actions": [],
+    "tags": [
+      "attack.persistence",
+      "attack.t1136.003",
+      "lab-library"
     ]
   }
 ]

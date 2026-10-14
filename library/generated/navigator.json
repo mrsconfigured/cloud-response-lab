@@ -21,9 +21,21 @@
     },
     {
       "techniqueID": "T1098.003",
-      "score": 2,
+      "score": 3,
       "enabled": true,
-      "comment": "Offline pySigma AST replay only: aws-admin-attachment, entra-role-member"
+      "comment": "Offline pySigma AST replay only: aws-admin-attachment, entra-app-role-assignment, entra-role-member"
+    },
+    {
+      "techniqueID": "T1136.003",
+      "score": 1,
+      "enabled": true,
+      "comment": "Offline pySigma AST replay only: entra-user-created"
+    },
+    {
+      "techniqueID": "T1528",
+      "score": 1,
+      "enabled": true,
+      "comment": "Offline pySigma AST replay only: entra-consent-granted"
     },
     {
       "techniqueID": "T1556.009",

@@ -8,7 +8,7 @@ permissions:
 jobs:
   offline-validation:
     runs-on: ubuntu-24.04
-    timeout-minutes: 5
+    timeout-minutes: 8
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2, verified upstream
         with:
@@ -20,14 +20,20 @@ jobs:
         run: python -m pip install -r requirements-v1.lock
       - name: Compile genuine Sigma
         run: python -m v1.build && git diff --exit-code -- v1/generated v1/kibana
-      - name: Compile library and verify deterministic matrix and ATT&CK layer
-        run: python -m library.build && git diff --exit-code -- library/generated
+      - name: Compile the pack library and verify matrix, rules and per-pack ATT&CK layers
+        run: python -m library.build && git diff --exit-code -- library/generated packs/aws/attack-layer.json packs/entra/attack-layer.json
+      - name: Shuffle workflows are generated from the playbook files
+        run: python -m core.shuffle_export && git diff --exit-code -- packs
       - name: Structural lint and playbook validation
         run: python scripts/validate.py
-      - name: Per-rule acceptance and response safety tests
+      - name: Platform acceptance and response safety tests
         run: python -m unittest discover -s tests -v
+      - name: Pack detection tests and playbook UAT (every pack)
+        run: python -m unittest discover -s packs -t . -v
+      - name: Console, approval gate and pack-structure tests
+        run: python -m unittest discover -s core -t . -v
       - name: Optimized safety regression
-        run: python -O -m unittest discover -s tests -v
+        run: python -O -m unittest discover -s tests && python -O -m unittest discover -s packs -t . && python -O -m unittest discover -s core -t .
       - name: Detection fixture report
         run: python lab.py
       - name: Patch whitespace check

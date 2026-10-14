@@ -1,0 +1,123 @@
+{
+  "positive": [
+    {
+      "name": "success without MFA",
+      "event": {
+        "eventVersion": "1.11",
+        "eventTime": "2026-10-14T19:32:04Z",
+        "awsRegion": "us-east-1",
+        "sourceIPAddress": "203.0.113.10",
+        "userAgent": "lab-test-agent",
+        "recipientAccountId": "111111111111",
+        "readOnly": false,
+        "managementEvent": true,
+        "eventType": "AwsConsoleSignIn",
+        "eventID": "00000000-0000-4000-8000-000000000017",
+        "userIdentity": {
+          "type": "IAMUser",
+          "userName": "lab-operator",
+          "accountId": "111111111111"
+        },
+        "eventSource": "signin.amazonaws.com",
+        "eventName": "ConsoleLogin",
+        "responseElements": {
+          "ConsoleLogin": "Success"
+        },
+        "additionalEventData": {
+          "MFAUsed": "No",
+          "LoginTo": "https://console.aws.amazon.com/console/home"
+        }
+      }
+    }
+  ],
+  "negative": [
+    {
+      "name": "success with MFA",
+      "event": {
+        "eventVersion": "1.11",
+        "eventTime": "2026-10-14T19:32:04Z",
+        "awsRegion": "us-east-1",
+        "sourceIPAddress": "203.0.113.10",
+        "userAgent": "lab-test-agent",
+        "recipientAccountId": "111111111111",
+        "readOnly": false,
+        "managementEvent": true,
+        "eventType": "AwsConsoleSignIn",
+        "eventID": "00000000-0000-4000-8000-000000000018",
+        "userIdentity": {
+          "type": "IAMUser",
+          "userName": "lab-operator",
+          "accountId": "111111111111"
+        },
+        "eventSource": "signin.amazonaws.com",
+        "eventName": "ConsoleLogin",
+        "responseElements": {
+          "ConsoleLogin": "Success"
+        },
+        "additionalEventData": {
+          "MFAUsed": "Yes",
+          "LoginTo": "https://console.aws.amazon.com/console/home"
+        }
+      }
+    },
+    {
+      "name": "failed login",
+      "event": {
+        "eventVersion": "1.11",
+        "eventTime": "2026-10-14T19:32:04Z",
+        "awsRegion": "us-east-1",
+        "sourceIPAddress": "203.0.113.10",
+        "userAgent": "lab-test-agent",
+        "recipientAccountId": "111111111111",
+        "readOnly": false,
+        "managementEvent": true,
+        "eventType": "AwsConsoleSignIn",
+        "eventID": "00000000-0000-4000-8000-000000000019",
+        "userIdentity": {
+          "type": "IAMUser",
+          "userName": "lab-operator",
+          "accountId": "111111111111"
+        },
+        "eventSource": "signin.amazonaws.com",
+        "eventName": "ConsoleLogin",
+        "responseElements": {
+          "ConsoleLogin": "Failure"
+        },
+        "additionalEventData": {
+          "MFAUsed": "No",
+          "LoginTo": "https://console.aws.amazon.com/console/home"
+        }
+      }
+    },
+    {
+      "name": "success without MFA but error code",
+      "event": {
+        "eventVersion": "1.11",
+        "eventTime": "2026-10-14T19:32:04Z",
+        "awsRegion": "us-east-1",
+        "sourceIPAddress": "203.0.113.10",
+        "userAgent": "lab-test-agent",
+        "recipientAccountId": "111111111111",
+        "readOnly": false,
+        "managementEvent": true,
+        "eventType": "AwsConsoleSignIn",
+        "eventID": "00000000-0000-4000-8000-000000000020",
+        "userIdentity": {
+          "type": "IAMUser",
+          "userName": "lab-operator",
+          "accountId": "111111111111"
+        },
+        "eventSource": "signin.amazonaws.com",
+        "eventName": "ConsoleLogin",
+        "responseElements": {
+          "ConsoleLogin": "Success"
+        },
+        "additionalEventData": {
+          "MFAUsed": "No",
+          "LoginTo": "https://console.aws.amazon.com/console/home"
+        },
+        "errorCode": "Denied"
+      }
+    }
+  ]
+}

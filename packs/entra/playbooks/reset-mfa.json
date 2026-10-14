@@ -1,0 +1,66 @@
+{
+  "schema_version": 1,
+  "id": "reset-mfa",
+  "version": "1.0.0",
+  "pack": "entra",
+  "owner_lane": "response",
+  "title": "Reset MFA registration (dry-run)",
+  "trigger": {
+    "rule_ids": [
+      "8a7d441b-870b-4fce-bac4-000000000005",
+      "8a7d441b-870b-4fce-bac4-00000000000a"
+    ],
+    "event": {
+      "all_of": [
+        {
+          "path": "result",
+          "equals": "success"
+        }
+      ],
+      "none_of": []
+    }
+  },
+  "benign": {
+    "any_of": []
+  },
+  "protected_targets": [],
+  "target": {
+    "path": "targetResources.0.userPrincipalName",
+    "label": "affected user"
+  },
+  "approval": {
+    "required": true,
+    "approver_roles": [
+      "detection-owner",
+      "response-owner"
+    ],
+    "prompt": "Will remove the registered MFA methods of {target} so they must re-register."
+  },
+  "steps": [
+    {
+      "id": "list_auth_methods",
+      "action": "graph:GET /users/{id}/authentication/methods",
+      "params": {
+        "user": "{target}"
+      }
+    },
+    {
+      "id": "remove_auth_methods",
+      "action": "graph:DELETE /users/{id}/authentication/methods/{methodId}",
+      "params": {
+        "user": "{target}"
+      }
+    }
+  ],
+  "mode": "dry_run",
+  "live": {
+    "supported": false,
+    "required_permissions": [
+      "UserAuthenticationMethod.ReadWrite.All"
+    ],
+    "note": "The Azure app holds read-only Graph scopes."
+  },
+  "audit": {
+    "index": "lab-response-audit"
+  }
+}

@@ -12,7 +12,7 @@ INDEX = 'logs-cloud-response-lab-v1'
 
 
 def compile_rule():
-    rules = SigmaCollection.from_yaml((ROOT / 'detections/sigma/aws-admin-attachment.yml').read_text())
+    rules = SigmaCollection.from_yaml((ROOT / 'packs/aws/detections/aws-admin-attachment.yml').read_text())
     query, = LuceneBackend().convert(rules)
     return {'rule_id': RULE_ID, 'name': rules.rules[0].title,
             'description': rules.rules[0].description, 'type': 'query', 'language': 'lucene',

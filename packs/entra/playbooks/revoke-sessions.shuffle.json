@@ -1,0 +1,199 @@
+{
+  "actions": [
+    {
+      "app_id": "ccf48f29-1418-4e18-82cb-0f1aed55586d",
+      "app_name": "Shuffle Tools",
+      "app_version": "1.2.0",
+      "authentication_id": "",
+      "category": "",
+      "category_label": null,
+      "environment": "Shuffle",
+      "execution_delay": 0,
+      "execution_variable": {
+        "id": "",
+        "name": "",
+        "value": ""
+      },
+      "generated": false,
+      "id": "e55d2743-7973-5f38-a08d-9ebccab763db",
+      "isStartNode": true,
+      "is_valid": true,
+      "label": "validate",
+      "name": "repeat_back_to_me",
+      "parameters": [
+        {
+          "action_field": "",
+          "custom_value": false,
+          "error": "",
+          "hidden": false,
+          "id": "",
+          "multiselect": false,
+          "name": "call",
+          "skip_multicheck": false,
+          "unique_toggled": false,
+          "value": "{\"check\": \"runs only after human approval\", \"exec\": \"$exec\", \"mode\": \"dry_run\", \"playbook\": \"revoke-sessions\", \"version\": \"1.0.0\"}",
+          "value_replace": null,
+          "variant": "STATIC_VALUE"
+        }
+      ],
+      "parent_controlled": false,
+      "position": {
+        "x": 100.001,
+        "y": 100.001
+      },
+      "public": true,
+      "reference_url": "",
+      "run_magic_input": false,
+      "run_magic_output": false,
+      "sharing": true,
+      "source_execution": "",
+      "source_workflow": "",
+      "sub_action": false,
+      "suggestion": false
+    },
+    {
+      "app_id": "ccf48f29-1418-4e18-82cb-0f1aed55586d",
+      "app_name": "Shuffle Tools",
+      "app_version": "1.2.0",
+      "authentication_id": "",
+      "category": "",
+      "category_label": null,
+      "environment": "Shuffle",
+      "execution_delay": 0,
+      "execution_variable": {
+        "id": "",
+        "name": "",
+        "value": ""
+      },
+      "generated": false,
+      "id": "88e134cc-51cd-52a7-b787-2a06cb1db0db",
+      "is_valid": true,
+      "label": "plan",
+      "name": "repeat_back_to_me",
+      "parameters": [
+        {
+          "action_field": "",
+          "custom_value": false,
+          "error": "",
+          "hidden": false,
+          "id": "",
+          "multiselect": false,
+          "name": "call",
+          "skip_multicheck": false,
+          "unique_toggled": false,
+          "value": "{\"playbook\": \"revoke-sessions\", \"steps\": [{\"action\": \"graph:POST /users/{id}/revokeSignInSessions\", \"id\": \"revoke_sign_in_sessions\", \"simulated\": true}], \"target\": \"$exec.target\"}",
+          "value_replace": null,
+          "variant": "STATIC_VALUE"
+        }
+      ],
+      "parent_controlled": false,
+      "position": {
+        "x": 400.001,
+        "y": 100.001
+      },
+      "public": true,
+      "reference_url": "",
+      "run_magic_input": false,
+      "run_magic_output": false,
+      "sharing": true,
+      "source_execution": "",
+      "source_workflow": "",
+      "sub_action": false,
+      "suggestion": false
+    },
+    {
+      "app_id": "ccf48f29-1418-4e18-82cb-0f1aed55586d",
+      "app_name": "Shuffle Tools",
+      "app_version": "1.2.0",
+      "authentication_id": "",
+      "category": "",
+      "category_label": null,
+      "environment": "Shuffle",
+      "execution_delay": 0,
+      "execution_variable": {
+        "id": "",
+        "name": "",
+        "value": ""
+      },
+      "generated": false,
+      "id": "23ca755f-b420-5f17-b9b8-b497f6c7d4a9",
+      "is_valid": true,
+      "label": "record",
+      "name": "repeat_back_to_me",
+      "parameters": [
+        {
+          "action_field": "",
+          "custom_value": false,
+          "error": "",
+          "hidden": false,
+          "id": "",
+          "multiselect": false,
+          "name": "call",
+          "skip_multicheck": false,
+          "unique_toggled": false,
+          "value": "{\"changes_made\": false, \"mode\": \"dry_run\", \"playbook\": \"revoke-sessions\", \"result\": \"simulated\", \"steps\": [\"revoke_sign_in_sessions\"]}",
+          "value_replace": null,
+          "variant": "STATIC_VALUE"
+        }
+      ],
+      "parent_controlled": false,
+      "position": {
+        "x": 700.001,
+        "y": 100.001
+      },
+      "public": true,
+      "reference_url": "",
+      "run_magic_input": false,
+      "run_magic_output": false,
+      "sharing": true,
+      "source_execution": "",
+      "source_workflow": "",
+      "sub_action": false,
+      "suggestion": false
+    }
+  ],
+  "branches": [
+    {
+      "conditions": [],
+      "decorator": false,
+      "destination_id": "88e134cc-51cd-52a7-b787-2a06cb1db0db",
+      "has_errors": false,
+      "id": "86b8caf9-c8f9-5bc8-b8d2-fe22cdef67d3",
+      "label": "then",
+      "parent_controlled": false,
+      "source_id": "e55d2743-7973-5f38-a08d-9ebccab763db",
+      "source_parent": ""
+    },
+    {
+      "conditions": [],
+      "decorator": false,
+      "destination_id": "23ca755f-b420-5f17-b9b8-b497f6c7d4a9",
+      "has_errors": false,
+      "id": "ee5cfe93-661f-5c9d-8f3c-e30bd15cae17",
+      "label": "then",
+      "parent_controlled": false,
+      "source_id": "88e134cc-51cd-52a7-b787-2a06cb1db0db",
+      "source_parent": ""
+    }
+  ],
+  "configuration": {
+    "exit_on_error": false,
+    "skip_notifications": true,
+    "start_from_top": true
+  },
+  "default_return_value": "",
+  "description": "Revoke user sessions (dry-run). Dry-run only: every node echoes a record and changes nothing.",
+  "id": "3a1a3e42-0595-595a-9d17-667336a56a95",
+  "input_questions": null,
+  "name": "lab/entra/revoke-sessions@1.0.0",
+  "public": false,
+  "sharing": "private",
+  "start": "e55d2743-7973-5f38-a08d-9ebccab763db",
+  "tags": [
+    "lab",
+    "dry-run",
+    "entra"
+  ],
+  "triggers": [],
+  "workflow_variables": []
+}

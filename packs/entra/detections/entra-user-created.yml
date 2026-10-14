@@ -1,0 +1,22 @@
+title: "Entra New User Account Created"
+id: 8a7d441b-870b-4fce-bac4-00000000000a
+status: experimental
+description: "Successful creation of a new user in the directory. Combine with a role assignment to spot a new administrator account; on its own it is a low-fidelity signal."
+author: 1xLoZec
+date: 2026-10-14
+tags:
+  - attack.persistence
+  - attack.t1136.003
+logsource:
+  product: azure
+  service: auditlogs
+detection:
+  selection:
+    category: "UserManagement"
+    activityDisplayName: "Add user"
+    loggedByService: "Core Directory"
+    result: "success"
+  condition: selection
+falsepositives:
+  - "Joiner provisioning and break-glass account setup; verify against the HR or change ticket."
+level: medium

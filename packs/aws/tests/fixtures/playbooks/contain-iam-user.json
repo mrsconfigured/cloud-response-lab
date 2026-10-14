@@ -1,0 +1,201 @@
+{
+  "match": [
+    {
+      "name": "admin policy attached to a user",
+      "alert": {
+        "alert_id": "alert-000102",
+        "rule_id": "965a1068-c2bf-4ea5-b1d0-000000000002",
+        "event": {
+          "eventVersion": "1.11",
+          "eventTime": "2026-10-14T19:32:04Z",
+          "awsRegion": "us-east-1",
+          "sourceIPAddress": "203.0.113.10",
+          "userAgent": "lab-test-agent",
+          "recipientAccountId": "111111111111",
+          "readOnly": false,
+          "managementEvent": true,
+          "eventID": "00000000-0000-4000-8000-000000000101",
+          "userIdentity": {
+            "type": "IAMUser",
+            "userName": "lab-operator",
+            "accountId": "111111111111"
+          },
+          "eventSource": "iam.amazonaws.com",
+          "eventName": "AttachUserPolicy",
+          "requestParameters": {
+            "userName": "example-user",
+            "policyArn": "arn:aws:iam::aws:policy/AdministratorAccess"
+          }
+        }
+      }
+    },
+    {
+      "name": "access key created for a user",
+      "alert": {
+        "alert_id": "alert-000104",
+        "rule_id": "8a7d441b-870b-4fce-bac4-000000000003",
+        "event": {
+          "eventVersion": "1.11",
+          "eventTime": "2026-10-14T19:32:04Z",
+          "awsRegion": "us-east-1",
+          "sourceIPAddress": "203.0.113.10",
+          "userAgent": "lab-test-agent",
+          "recipientAccountId": "111111111111",
+          "readOnly": false,
+          "managementEvent": true,
+          "eventID": "00000000-0000-4000-8000-000000000103",
+          "userIdentity": {
+            "type": "IAMUser",
+            "userName": "lab-operator",
+            "accountId": "111111111111"
+          },
+          "eventSource": "iam.amazonaws.com",
+          "eventName": "CreateAccessKey",
+          "requestParameters": {
+            "userName": "example-user"
+          }
+        }
+      }
+    }
+  ],
+  "no_match": [
+    {
+      "name": "rule not in trigger",
+      "alert": {
+        "alert_id": "alert-000106",
+        "rule_id": "8a7d441b-870b-4fce-bac4-000000000001",
+        "event": {
+          "eventVersion": "1.11",
+          "eventTime": "2026-10-14T19:32:04Z",
+          "awsRegion": "us-east-1",
+          "sourceIPAddress": "203.0.113.10",
+          "userAgent": "lab-test-agent",
+          "recipientAccountId": "111111111111",
+          "readOnly": false,
+          "managementEvent": true,
+          "eventID": "00000000-0000-4000-8000-000000000105",
+          "userIdentity": {
+            "type": "IAMUser",
+            "userName": "lab-operator",
+            "accountId": "111111111111"
+          },
+          "eventSource": "iam.amazonaws.com",
+          "eventName": "AttachUserPolicy",
+          "requestParameters": {
+            "userName": "example-user"
+          }
+        }
+      }
+    },
+    {
+      "name": "denied attempt",
+      "alert": {
+        "alert_id": "alert-000108",
+        "rule_id": "8a7d441b-870b-4fce-bac4-000000000003",
+        "event": {
+          "eventVersion": "1.11",
+          "eventTime": "2026-10-14T19:32:04Z",
+          "awsRegion": "us-east-1",
+          "sourceIPAddress": "203.0.113.10",
+          "userAgent": "lab-test-agent",
+          "recipientAccountId": "111111111111",
+          "readOnly": false,
+          "managementEvent": true,
+          "eventID": "00000000-0000-4000-8000-000000000107",
+          "userIdentity": {
+            "type": "IAMUser",
+            "userName": "lab-operator",
+            "accountId": "111111111111"
+          },
+          "eventSource": "iam.amazonaws.com",
+          "eventName": "CreateAccessKey",
+          "errorCode": "AccessDenied",
+          "requestParameters": {
+            "userName": "example-user"
+          }
+        }
+      }
+    },
+    {
+      "name": "initiated by an AWS service (benign)",
+      "alert": {
+        "alert_id": "alert-000110",
+        "rule_id": "8a7d441b-870b-4fce-bac4-000000000003",
+        "event": {
+          "eventVersion": "1.11",
+          "eventTime": "2026-10-14T19:32:04Z",
+          "awsRegion": "us-east-1",
+          "sourceIPAddress": "203.0.113.10",
+          "userAgent": "lab-test-agent",
+          "recipientAccountId": "111111111111",
+          "readOnly": false,
+          "managementEvent": true,
+          "eventID": "00000000-0000-4000-8000-000000000109",
+          "userIdentity": {
+            "type": "AWSService",
+            "invokedBy": "example.amazonaws.com"
+          },
+          "eventSource": "iam.amazonaws.com",
+          "eventName": "CreateAccessKey",
+          "requestParameters": {
+            "userName": "example-user"
+          }
+        }
+      }
+    },
+    {
+      "name": "protected break-glass target",
+      "alert": {
+        "alert_id": "alert-000112",
+        "rule_id": "8a7d441b-870b-4fce-bac4-000000000003",
+        "event": {
+          "eventVersion": "1.11",
+          "eventTime": "2026-10-14T19:32:04Z",
+          "awsRegion": "us-east-1",
+          "sourceIPAddress": "203.0.113.10",
+          "userAgent": "lab-test-agent",
+          "recipientAccountId": "111111111111",
+          "readOnly": false,
+          "managementEvent": true,
+          "eventID": "00000000-0000-4000-8000-000000000111",
+          "userIdentity": {
+            "type": "IAMUser",
+            "userName": "lab-operator",
+            "accountId": "111111111111"
+          },
+          "eventSource": "iam.amazonaws.com",
+          "eventName": "CreateAccessKey",
+          "requestParameters": {
+            "userName": "break-glass-admin"
+          }
+        }
+      }
+    },
+    {
+      "name": "no target user in the request",
+      "alert": {
+        "alert_id": "alert-000114",
+        "rule_id": "8a7d441b-870b-4fce-bac4-000000000003",
+        "event": {
+          "eventVersion": "1.11",
+          "eventTime": "2026-10-14T19:32:04Z",
+          "awsRegion": "us-east-1",
+          "sourceIPAddress": "203.0.113.10",
+          "userAgent": "lab-test-agent",
+          "recipientAccountId": "111111111111",
+          "readOnly": false,
+          "managementEvent": true,
+          "eventID": "00000000-0000-4000-8000-000000000113",
+          "userIdentity": {
+            "type": "IAMUser",
+            "userName": "lab-operator",
+            "accountId": "111111111111"
+          },
+          "eventSource": "iam.amazonaws.com",
+          "eventName": "CreateAccessKey",
+          "requestParameters": {}
+        }
+      }
+    }
+  ]
+}

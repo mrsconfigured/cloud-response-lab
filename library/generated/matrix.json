@@ -78,6 +78,19 @@
     "query_engine_live": false
   },
   {
+    "slug": "entra-app-role-assignment",
+    "id": "8a7d441b-870b-4fce-bac4-000000000008",
+    "provider": "entra",
+    "logsource": {
+      "product": "azure",
+      "service": "auditlogs"
+    },
+    "technique": "T1098.003",
+    "positive": 1,
+    "negative": 10,
+    "query_engine_live": false
+  },
+  {
     "slug": "entra-conditional-access-delete",
     "id": "8a7d441b-870b-4fce-bac4-000000000007",
     "provider": "entra",
@@ -91,6 +104,19 @@
     "query_engine_live": false
   },
   {
+    "slug": "entra-consent-granted",
+    "id": "8a7d441b-870b-4fce-bac4-000000000009",
+    "provider": "entra",
+    "logsource": {
+      "product": "azure",
+      "service": "auditlogs"
+    },
+    "technique": "T1528",
+    "positive": 2,
+    "negative": 10,
+    "query_engine_live": false
+  },
+  {
     "slug": "entra-role-member",
     "id": "8a7d441b-870b-4fce-bac4-000000000005",
     "provider": "entra",
@@ -99,6 +125,19 @@
       "service": "auditlogs"
     },
     "technique": "T1098.003",
+    "positive": 1,
+    "negative": 10,
+    "query_engine_live": false
+  },
+  {
+    "slug": "entra-user-created",
+    "id": "8a7d441b-870b-4fce-bac4-00000000000a",
+    "provider": "entra",
+    "logsource": {
+      "product": "azure",
+      "service": "auditlogs"
+    },
+    "technique": "T1136.003",
     "positive": 1,
     "negative": 10,
     "query_engine_live": false

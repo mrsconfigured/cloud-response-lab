@@ -1,0 +1,199 @@
+{
+  "actions": [
+    {
+      "app_id": "ccf48f29-1418-4e18-82cb-0f1aed55586d",
+      "app_name": "Shuffle Tools",
+      "app_version": "1.2.0",
+      "authentication_id": "",
+      "category": "",
+      "category_label": null,
+      "environment": "Shuffle",
+      "execution_delay": 0,
+      "execution_variable": {
+        "id": "",
+        "name": "",
+        "value": ""
+      },
+      "generated": false,
+      "id": "72e11104-8b54-5d4c-ad85-9ad56fccc317",
+      "isStartNode": true,
+      "is_valid": true,
+      "label": "validate",
+      "name": "repeat_back_to_me",
+      "parameters": [
+        {
+          "action_field": "",
+          "custom_value": false,
+          "error": "",
+          "hidden": false,
+          "id": "",
+          "multiselect": false,
+          "name": "call",
+          "skip_multicheck": false,
+          "unique_toggled": false,
+          "value": "{\"check\": \"runs only after human approval\", \"exec\": \"$exec\", \"mode\": \"dry_run\", \"playbook\": \"contain-iam-user\", \"version\": \"1.0.0\"}",
+          "value_replace": null,
+          "variant": "STATIC_VALUE"
+        }
+      ],
+      "parent_controlled": false,
+      "position": {
+        "x": 100.001,
+        "y": 100.001
+      },
+      "public": true,
+      "reference_url": "",
+      "run_magic_input": false,
+      "run_magic_output": false,
+      "sharing": true,
+      "source_execution": "",
+      "source_workflow": "",
+      "sub_action": false,
+      "suggestion": false
+    },
+    {
+      "app_id": "ccf48f29-1418-4e18-82cb-0f1aed55586d",
+      "app_name": "Shuffle Tools",
+      "app_version": "1.2.0",
+      "authentication_id": "",
+      "category": "",
+      "category_label": null,
+      "environment": "Shuffle",
+      "execution_delay": 0,
+      "execution_variable": {
+        "id": "",
+        "name": "",
+        "value": ""
+      },
+      "generated": false,
+      "id": "c8177d78-01b4-506e-81c1-d9002ec7967c",
+      "is_valid": true,
+      "label": "plan",
+      "name": "repeat_back_to_me",
+      "parameters": [
+        {
+          "action_field": "",
+          "custom_value": false,
+          "error": "",
+          "hidden": false,
+          "id": "",
+          "multiselect": false,
+          "name": "call",
+          "skip_multicheck": false,
+          "unique_toggled": false,
+          "value": "{\"playbook\": \"contain-iam-user\", \"steps\": [{\"action\": \"iam:UpdateAccessKey\", \"id\": \"deactivate_access_keys\", \"simulated\": true}, {\"action\": \"iam:PutUserPolicy\", \"id\": \"attach_deny_all\", \"simulated\": true}], \"target\": \"$exec.target\"}",
+          "value_replace": null,
+          "variant": "STATIC_VALUE"
+        }
+      ],
+      "parent_controlled": false,
+      "position": {
+        "x": 400.001,
+        "y": 100.001
+      },
+      "public": true,
+      "reference_url": "",
+      "run_magic_input": false,
+      "run_magic_output": false,
+      "sharing": true,
+      "source_execution": "",
+      "source_workflow": "",
+      "sub_action": false,
+      "suggestion": false
+    },
+    {
+      "app_id": "ccf48f29-1418-4e18-82cb-0f1aed55586d",
+      "app_name": "Shuffle Tools",
+      "app_version": "1.2.0",
+      "authentication_id": "",
+      "category": "",
+      "category_label": null,
+      "environment": "Shuffle",
+      "execution_delay": 0,
+      "execution_variable": {
+        "id": "",
+        "name": "",
+        "value": ""
+      },
+      "generated": false,
+      "id": "b8d09fee-f6fc-5d98-a44a-1ecf2c326ee9",
+      "is_valid": true,
+      "label": "record",
+      "name": "repeat_back_to_me",
+      "parameters": [
+        {
+          "action_field": "",
+          "custom_value": false,
+          "error": "",
+          "hidden": false,
+          "id": "",
+          "multiselect": false,
+          "name": "call",
+          "skip_multicheck": false,
+          "unique_toggled": false,
+          "value": "{\"changes_made\": false, \"mode\": \"dry_run\", \"playbook\": \"contain-iam-user\", \"result\": \"simulated\", \"steps\": [\"deactivate_access_keys\", \"attach_deny_all\"]}",
+          "value_replace": null,
+          "variant": "STATIC_VALUE"
+        }
+      ],
+      "parent_controlled": false,
+      "position": {
+        "x": 700.001,
+        "y": 100.001
+      },
+      "public": true,
+      "reference_url": "",
+      "run_magic_input": false,
+      "run_magic_output": false,
+      "sharing": true,
+      "source_execution": "",
+      "source_workflow": "",
+      "sub_action": false,
+      "suggestion": false
+    }
+  ],
+  "branches": [
+    {
+      "conditions": [],
+      "decorator": false,
+      "destination_id": "c8177d78-01b4-506e-81c1-d9002ec7967c",
+      "has_errors": false,
+      "id": "686c9850-06e1-5bf8-9a35-2dd17d6f5708",
+      "label": "then",
+      "parent_controlled": false,
+      "source_id": "72e11104-8b54-5d4c-ad85-9ad56fccc317",
+      "source_parent": ""
+    },
+    {
+      "conditions": [],
+      "decorator": false,
+      "destination_id": "b8d09fee-f6fc-5d98-a44a-1ecf2c326ee9",
+      "has_errors": false,
+      "id": "cda0c2a4-7f4a-51c9-92f1-7b3efe7f7693",
+      "label": "then",
+      "parent_controlled": false,
+      "source_id": "c8177d78-01b4-506e-81c1-d9002ec7967c",
+      "source_parent": ""
+    }
+  ],
+  "configuration": {
+    "exit_on_error": false,
+    "skip_notifications": true,
+    "start_from_top": true
+  },
+  "default_return_value": "",
+  "description": "Contain IAM user (dry-run). Dry-run only: every node echoes a record and changes nothing.",
+  "id": "44b2a9de-3945-53b4-b4dd-1f15dd7c1c84",
+  "input_questions": null,
+  "name": "lab/aws/contain-iam-user@1.0.0",
+  "public": false,
+  "sharing": "private",
+  "start": "72e11104-8b54-5d4c-ad85-9ad56fccc317",
+  "tags": [
+    "lab",
+    "dry-run",
+    "aws"
+  ],
+  "triggers": [],
+  "workflow_variables": []
+}

@@ -1,0 +1,65 @@
+{
+  "name": "entra",
+  "provider": "entra",
+  "lane": "Identity",
+  "log_source": "Microsoft Entra directory audit",
+  "index": "logs-cloud-response-lab-library-entra",
+  "time_field": "activityDateTime",
+  "id_field": "id",
+  "data_view": "lab-entra",
+  "fields": {
+    "actor": [
+      "initiatedBy.user.userPrincipalName",
+      "initiatedBy.app.displayName"
+    ],
+    "actor_type": "initiatedBy.user.id",
+    "operation": "activityDisplayName",
+    "service": "loggedByService",
+    "source_ip": "initiatedBy.user.ipAddress",
+    "region": null,
+    "target": [
+      "targetResources.0.displayName",
+      "targetResources.0.userPrincipalName"
+    ],
+    "error": "result"
+  },
+  "actions": [
+    {
+      "id": "acknowledge",
+      "label": "Acknowledge",
+      "style": "secondary"
+    },
+    {
+      "id": "reset_mfa",
+      "label": "Reset MFA",
+      "style": "secondary",
+      "playbook": "reset-mfa"
+    },
+    {
+      "id": "revoke_sessions",
+      "label": "Revoke sessions",
+      "style": "danger",
+      "playbook": "revoke-sessions"
+    },
+    {
+      "id": "disable_principal",
+      "label": "Disable principal",
+      "style": "danger",
+      "playbook": "disable-service-principal"
+    }
+  ],
+  "enabled_rules": [
+    "entra-app-credential",
+    "entra-app-role-assignment",
+    "entra-conditional-access-delete",
+    "entra-consent-granted",
+    "entra-role-member",
+    "entra-user-created"
+  ],
+  "fixture_only": [
+    "entra-signin-mfa-fatigue",
+    "entra-signin-impossible-travel",
+    "entra-signin-brute-force"
+  ],
+  "fixture_only_reason": "Sign-in logs need Entra ID P1 or P2; no license is purchased, so these rules are tested against fixtures only."
+}

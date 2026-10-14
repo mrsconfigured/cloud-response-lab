@@ -1,103 +1,129 @@
-# Building a cloud-response lab, validated on real logs
+# A cloud detection and response lab on real logs
 
-**Status: partial, and honest about it.** Detection logic is proven end to end on real cloud telemetry for 2 of 8 rules. The other 6 are tested only against fixtures. Response automation is dry-run only. Nothing here is a finished SOC.
+**Status: working end to end, partial overall.** AWS CloudTrail and Entra directory-audit logs from personal sandbox accounts flow into Elasticsearch on a schedule, repo-defined rules alert on them, and a Discord console turns alerts into approval-gated, dry-run response. Five of the eleven live rules have matched real events; the other six are tested on fixtures only. Nothing in the response path can change an account. This page says what was measured and what was not.
 
 ## At a glance
 
 | Question | Answer, with proof |
 |---|---|
-| Real telemetry loaded? | Yes. 1,266 real AWS CloudTrail events (2026-10-14 13:52Z to 19:36Z) and 65 real Entra directory audit events (13:02Z to 14:28Z). Personal sandbox accounts only. |
-| Real attacks run? | Yes. Stratus Red Team v2.37.0, IAM-only, no-cost techniques. See below. |
-| Detections fired on real events? | Yes: the AdministratorAccess rule matched 3 real events and the access-key rule matched 4. |
-| Did the scheduler fire alerts by itself? | Yes, for events inside the rule lookback window: 2 alerts, created 14 to 23 seconds after the events were indexed. |
-| Response automation? | Staged workflows executed in dry-run only. No automated action was ever taken against an account. |
-| Unproven | Entra sign-in logs, 6 of 8 rules on real data, continuous ingestion, HTTPS. See "Not proven". |
+| Real telemetry? | Yes. As of 2026-10-14 20:50Z: 1,315 CloudTrail and 65 Entra directory-audit documents, loaded on a schedule. Personal sandbox accounts only. |
+| Does it run without a person? | Yes. A fresh attack simulation at 20:45:20Z produced Discord alert cards at 20:52:04Z to 20:52:09Z, 6 min 44 s later, with no manual step. See the timeline below. |
+| Do detections work on real events? | Five of eleven rules matched real events. See the table. |
+| Is deployed equal to the repo? | Yes. Rule lookback, interval, severity and enabled state come from `core/config.json` and each pack's `pack.json`; a drift check found differences before the first deploy and none after. |
+| Can the response change anything? | No. Every playbook is dry-run: the AWS response identity holds no destructive permission and the Azure app holds read-only Graph scopes. |
+| Tests | 153 (76 platform, 54 pack, 23 console), run in normal and optimized mode in CI. 28 playbook UAT cases pass. |
+| Not proven | Discord button clicks and slash commands (not yet used by a person), sign-in detections, six rules on real data, HTTPS, branch protection. See the end. |
+
+```mermaid
+flowchart LR
+  CT[CloudTrail in S3] -->|read-only IAM user, cron| ES[(Elasticsearch)]
+  EN[Entra audit via Graph] -->|hourly, secret never stored on host| ES
+  ES --> R[Kibana rules built from the repo] --> A[Alerts]
+  A --> O[Outbox] --> P[Poster] --> D[Discord alert card]
+  D -->|click| G[Approval gate]
+  G -->|confirm| S[Shuffle dry-run workflow]
+  G --> AU[(Audit index)]
+  ES --> M[Scorecard, hunts, enrichment]
+```
+
+## Packs: how the lab grows
+
+Each log source is a self-contained pack:
+
+```
+packs/<name>/
+  pack.json          field mapping for cards, Kibana data view, action buttons, enabled rules
+  detections/        Sigma rules
+  playbooks/         response as code (JSON) + the generated Shuffle workflow beside each
+  tests/             two-line test modules that use the shared kit in core/testkit.py
+  attack-layer.json  generated ATT&CK Navigator layer
+  README.md
+core/                the platform: console, approval gate, playbook runner, CI report, metrics, deploy
+```
+
+Adding a lab means adding `packs/<name>/` with that shape. The console, CI and metrics read `pack.json` and need no code change; a test builds an alert card for a made-up cloud to prove it. Two packs exist (AWS, Entra). Rule counts: AWS 5, Entra 6 live plus 3 fixture-only.
 
 ## What ran
 
-**Data.** CloudTrail objects were pulled from the sandbox account's S3 bucket with boto3 and bulk-loaded into a private Elasticsearch 9.5.5. The loader is idempotent: the document id is the CloudTrail event id, so reruns update rather than duplicate. Of 1,269 records, 3 were rejected for field-type conflicts in unrelated services' request parameters. Entra audit logs came from Microsoft Graph (client credentials).
+**Data.** A scheduled loader pulls the last two days of CloudTrail objects every ten minutes and loads them idempotently (document id = CloudTrail `eventID`). It uses a dedicated IAM user that can only list and read the trail prefix. Checked against that policy: listing and reading the trail succeed; writes, deletes, listing other prefixes or buckets, and IAM, CloudTrail and EC2 calls are all denied (2 allowed, 8 denied). The attack-simulation identity is never used for ingestion. Entra audit logs are pulled hourly by a gateway-side script that pipes the Azure secret over SSH to a temp file the loader deletes first, so the secret is never stored on the lab host. A few documents per run are rejected for field-type conflicts in unrelated services' request parameters (3 of 1,318 on the latest run).
 
-**Attack simulation.** Stratus Red Team v2.37.0, three IAM-only detonations, each followed by cleanup:
+**Attack simulation.** Stratus Red Team v2.37.0, IAM-only techniques with cleanup, three detonations (18:41Z, 19:32Z, 20:45Z). After each, an IAM re-list showed no leftover principal. The attack-simulation IAM user is **intentionally privileged**, because Stratus needs those permissions; it was created from a console session without MFA, and that is recorded as a finding.
 
-- aws.persistence.iam-create-admin-user at 18:41Z and again at 19:32Z
-- aws.persistence.iam-backdoor-user at 18:41Z
+## Detections on real data
 
-After cleanup, an IAM re-list showed only the lab user with one access key, and Stratus reported every technique as COLD. One cleanup needed manual repair: the first backdoor-user teardown was denied `iam:DeleteLoginProfile` for the lab user, so the leftover IAM user was deleted directly and the teardown was rerun.
-
-**Detections on real data (manual query against the real index).**
-
-| Rule | Real hits | Event ids (first 8) |
+| Rule | ATT&CK | Real matches (queried against the live index) |
 |---|---|---|
-| IAM AdministratorAccess policy attached | 3 | af37c58b, 383a748d, be7e93aa |
-| IAM access key created | 4 | fe383fb3, 633a461a, 31e5b6af, 995abdf7 |
-| Console login without MFA | 0 | none |
-| CloudTrail logging stopped | 0 | none |
-| CloudTrail trail deleted | 0 | none |
+| AWS IAM access key created | T1098.001 | 6 |
+| AWS IAM AdministratorAccess attached | T1098.003 | 4 |
+| Entra app role assigned to a service principal | T1098.003 | 2 |
+| Entra application consent or delegated grant | T1528 | 2 |
+| Entra new user created | T1136.003 | 1 |
+| AWS console login without MFA, CloudTrail logging stopped, CloudTrail trail deleted | T1078.004, T1562.008 | 0 (fixtures only) |
+| Entra app credential added, role member added, conditional access policy deleted | T1098.001, T1098.003, T1556.009 | 0 (fixtures only) |
+| Entra MFA fatigue, impossible travel, brute force | T1621, T1078.004, T1110 | fixture only: sign-in logs need Entra ID P1 or P2 |
 
-Zero hits means no matching event in this window. It is not evidence that those rules work.
+Zero matches means no such event has happened in the data, not that the rule works. The Entra matches are historical events from setting up the app registration; they are older than the rule lookback, so they match the query but did not alert.
 
-**Scheduler proof.** Both matching rules were enabled in Kibana. A rule that merely exists proves nothing, so the check was whether the scheduler would alert without a manual query. The first attempt produced zero alerts: the rules looked back only 10 minutes, and the events were older than that by the time the rules were enabled. The lookback was widened to 30 minutes, because CloudTrail delivery and ingestion lag the event. A fresh simulation was then run at 19:32:04Z. The events were indexed at 19:38:36Z and the scheduler created two alerts on its own, at 19:38:49.920Z and 19:38:58.929Z (high severity, risk score 73). Evidence: [auto-alerts-redacted-20261014.json](evidence/auto-alerts-redacted-20261014.json).
+## Unattended proof
 
-The 406 and 415 second figure between event time and alert time is mostly CloudTrail delivery plus a manual ingest. It is not detection latency. Detection latency, from indexing to alert, was 14 to 23 seconds.
+Times are UTC on 2026-10-14. Nobody touched anything between the first and last row.
 
-**Triage of the two unexplained early matches.** The 13:58:54Z AttachUserPolicy and 13:59:54Z CreateAccessKey matches predate the simulation. The raw events show a console session (no MFA) on an administrator role creating the lab's IAM user, attaching AdministratorAccess to it, and a minute later creating its access key. That key is the one the simulation later used. Verdict: expected lab bootstrap, and the rule worked as designed. It is also a real finding: the lab identity holds AdministratorAccess and was created from a session without MFA. Least privilege is the fix.
+| Time | Step |
+|---|---|
+| 20:45:20 | Stratus detonation (create admin user, attach AdministratorAccess, create key, clean up) |
+| 20:50:08 | Scheduled loader pulled the new CloudTrail objects |
+| 20:50:49, 20:50:58 | Scheduled rules alerted (access key created, AdministratorAccess attached) |
+| 20:52:04 to 20:52:09 | Alert cards, each with its button card, posted to Discord |
+
+The 6 min 44 s from event to card is mostly CloudTrail delivery plus the loader's ten-minute cadence. It is not detection latency. A third alert in the same run was for the creation of the loader's own read-only IAM user at 20:42:30: the pipeline detected a real change made while building it.
+
+## Response as code
+
+Four playbooks are versioned files with a Shuffle workflow generated from each: `contain-iam-user` (AWS) and `disable-service-principal`, `revoke-sessions`, `reset-mfa` (Entra). For every playbook, tests assert that it acts only on matching events, halts for approval before any change, does nothing on benign events, and writes an audit record for every outcome including refusals. Confirming one runs a real Shuffle execution (three nodes, all successful) that only echoes a simulated record. In the live check, an unauthorised confirm was refused, a confirm from an approver ran the workflow and printed its audit line, and a second confirm was refused.
 
 ## Screenshots
 
-All three were captured with a read-only account and checked for account ids, addresses and emails before publication.
+Captured with a read-only account and checked for identifying data before publication. They show the first run's two alerts.
 
 ![Real IAM events in Discover](evidence/screenshots/kibana-discover-real-iam-events.png)
 
-Real CloudTrail events from the simulation (CreateUser, AttachUserPolicy, CreateAccessKey, DeleteUser at 18:41Z to 18:42Z).
-
 ![Entra audit events in Discover](evidence/screenshots/kibana-discover-entra-audit.png)
-
-The 65 real Entra audit events. None match the three Entra rules.
 
 ![Auto-generated alerts](evidence/screenshots/kibana-security-alerts-auto-generated.png)
 
-The two alerts the scheduler created on its own.
-
 ## ATT&CK coverage map
 
-Technique ids come from the generated matrix in `library/generated/matrix.json`. Layer file: [navigator.json](../library/generated/navigator.json).
+Per-pack layers: [AWS](../packs/aws/attack-layer.json), [Entra](../packs/entra/attack-layer.json). Green is an enabled rule on a live source, grey is fixture only.
 
-| Technique | Tactic | Rule | Provider | Status on real data |
-|---|---|---|---|---|
-| T1098.003 Additional Cloud Roles | Persistence, Privilege Escalation | aws-admin-attachment | AWS | Matched 3 real events. Scheduler alert proven. |
-| T1098.001 Additional Cloud Credentials | Persistence | aws-access-key-create | AWS | Matched 4 real events. Scheduler alert proven. |
-| T1562.008 Disable or Modify Cloud Logs | Defense Evasion | aws-cloudtrail-stop | AWS | Fixture only. Not simulated: it would touch the trail. |
-| T1562.008 Disable or Modify Cloud Logs | Defense Evasion | aws-cloudtrail-delete | AWS | Fixture only. Not simulated. |
-| T1078.004 Cloud Accounts | Defense Evasion, Persistence, Privilege Escalation, Initial Access | aws-console-no-mfa | AWS | Fixture only. No console login in the window. |
-| T1098.003 Additional Cloud Roles | Persistence, Privilege Escalation | entra-role-member | Entra | Real data loaded, 0 matches. Fixture only. |
-| T1098.001 Additional Cloud Credentials | Persistence | entra-app-credential | Entra | Real data loaded, 0 matches. Fixture only. |
-| T1556.009 Conditional Access Policies | Credential Access, Defense Evasion, Persistence | entra-conditional-access-delete | Entra | Real data loaded, 0 matches. Fixture only. |
+| Technique | Pack | Rules | Status |
+|---|---|---|---|
+| T1098.001 Additional Cloud Credentials | AWS, Entra | access key created; app credential added | enabled; the AWS rule has real matches |
+| T1098.003 Additional Cloud Roles | AWS, Entra | admin attached; app role assigned; role member added | enabled; real matches on two |
+| T1562.008 Disable or Modify Cloud Logs | AWS | logging stopped; trail deleted | enabled; no real event, not simulated because it would touch the trail |
+| T1078.004 Cloud Accounts | AWS, Entra | console login without MFA; impossible travel | AWS enabled with no real event; Entra fixture only |
+| T1528 Steal Application Access Token | Entra | consent granted | enabled; real match |
+| T1136.003 Create Account: Cloud Account | Entra | new user created | enabled; real match |
+| T1556.009 Conditional Access Policies | Entra | CA policy deleted | enabled; no real event |
+| T1110 Brute Force, T1621 MFA Request Generation | Entra | sign-in rules | fixture only |
 
-**Real-data coverage: 2 of 8 rules.** The other 6 have fixture coverage only, and 3 of those have real Entra data loaded that simply contains nothing matching. These are behavioural mappings, not adversary attribution or a coverage percentage. Authorized changes can fire. Missing logs and alternate operation names can miss.
-
-## What the library adds
-
-Eight genuine Sigma YAML rules (five AWS CloudTrail, three Entra audit). The compiler produces disabled Lucene rules with provider-separated indices, a deterministic matrix and a Navigator layer. Ten positive and 71 negative generated cases exercise a bounded pySigma AST test oracle, and independent fixed operation contracts prevent silent selection drift. Every rule has an individual unit test and an offline dry-run response contract. The suite runs 73 tests in normal and optimized modes in continuous integration.
+These are behavioural hypotheses, not a coverage percentage. Authorized changes can fire; missing logs and other operation names can miss.
 
 ## Engineering lessons
 
-- A compiler passing is not a query engine agreeing. Parity had to be shown against real Elasticsearch, and only 2 rules have been.
-- Lookback has to exceed delivery lag. A rule with a 10 minute window never saw events that CloudTrail delivered minutes late. Widening it to 30 minutes is what made the scheduler alert.
-- A rule that merely exists proves nothing. The first scheduler check returned zero alerts, which exposed that the earlier "match" was a manual query.
-- Check your own style linter against files you do not own. The first hosted CI run failed because a validator rejected pre-existing partner files that lacked trailing newlines.
-- Cleanup needs verifying, not trusting. A teardown can fail on a permission the simulation needs, and only an IAM re-list shows what was left behind.
-- Gate any screenshot automation on a text check. One capture silently fell back to the wrong data view and exposed an account id in its rows. It was caught and deleted before it was committed, and the script now refuses to save a page that shows a 12-digit id, an address or an email.
-- Direct API response is not orchestration. A workflow export is not execution evidence.
-- Terraform output manifests are not provisioning. The module is provider-free and plan-only. It now passes `fmt`, `validate` and `plan` on Terraform 1.16.6, and creates no resources.
+- A rule that merely exists proves nothing. The first scheduler check returned zero alerts because the rules looked back 10 minutes and CloudTrail delivers later. Lookback is now one config value, and a drift check compares the repo with Kibana.
+- Redaction needs its own tests. The first version masked the last group of GUIDs as if they were account ids, which would have corrupted event ids on every card; a regression test now pins that.
+- Run it against real services before believing it. Live use found a text-mapped field that broke an aggregation, a hunt verdict that claimed a rule had not fired when it had, a link Discord rejected because of unencoded quotes, and a test runner that printed progress into JSON output. Each has a test.
+- A screenshot script needs a text gate. One capture silently showed the wrong data view and exposed an account id; it was caught and deleted before commit, and the script now refuses pages showing an id, an address or an e-mail.
+- Cleanup needs verifying, not trusting. A teardown can fail on a permission the simulation needs; only an IAM re-list shows what is left.
 
 ## Not proven
 
-- **Entra sign-in logs.** Microsoft Graph refuses them with `Authentication_RequestFromNonPremiumTenantOrB2CTenant`. The tenant has no Entra P1 or P2 licence, so only directory audit logs are loaded.
-- **6 of 8 rules on real data**, as listed above.
-- **Continuous ingestion.** Loading is a manual, idempotent script. A scheduled pipeline would need long-lived cloud credentials on the lab host, which is a separate decision.
-- **Response automation.** Shuffle workflows ran in dry-run only. Shuffle's backend mounts the Docker socket, which is root-equivalent on the host. Access is restricted to the private network, concurrency is capped at 2, and workflows stay dry-run.
-- **HTTPS.** Kibana and Shuffle are served over plain HTTP on a private WireGuard network and are not reachable from the public internet.
-- **Branch protection and a genuine second-owner review** are not in place on this repository.
-- **Live rules differ from the repo.** The two enabled Kibana rules use a 30 minute lookback. The generated rules in this repository use 10 minutes.
+- **Discord button clicks and slash commands.** The cards render with their buttons and the handlers are built and tested against live services, but no person has clicked a button or typed a slash command yet. Native slash-command registration happens on a gateway restart.
+- **Sign-in detections.** Microsoft Graph refuses sign-in logs with `Authentication_RequestFromNonPremiumTenantOrB2CTenant`: the tenant has no Entra ID P1 or P2 licence, and no trial was started because it can bill.
+- **Six of eleven rules on real data**, listed above.
+- **Live containment.** Out of scope by design: the response identity and the Azure app lack write permissions, and the playbook files list what each would need.
+- **Alert-to-card latency under load,** and Discord delivery if the outbox backs up. Retries are bounded and a stuck entry is reported in `/lab_status`.
+- **HTTPS.** Kibana and Shuffle run over plain HTTP on a private WireGuard network and are not reachable from the public internet. Shuffle can reach the host's Docker socket, which is root-equivalent; access is restricted, concurrency is capped at 2, and workflows stay dry-run.
+- **Branch protection and an independent second-owner review** are not in place on this repository.
 
-Follow the [12-week guide and lifecycle gates](BUILD-GUIDE.md). Next: query-engine parity for the remaining rules in a separately authorized bounded run, and sign-in telemetry once a licence exists. No provider credential, private host address, private path or secret belongs in portfolio evidence.
+See [docs/CONSOLE.md](CONSOLE.md) to operate it and [docs/BUILD-GUIDE.md](BUILD-GUIDE.md) for the build-along. No provider credential, private host address, private path or secret belongs in portfolio evidence.

@@ -1,0 +1,60 @@
+{
+  "schema_version": 1,
+  "id": "revoke-sessions",
+  "version": "1.0.0",
+  "pack": "entra",
+  "owner_lane": "response",
+  "title": "Revoke user sessions (dry-run)",
+  "trigger": {
+    "rule_ids": [
+      "8a7d441b-870b-4fce-bac4-000000000005",
+      "8a7d441b-870b-4fce-bac4-000000000009",
+      "8a7d441b-870b-4fce-bac4-00000000000a"
+    ],
+    "event": {
+      "all_of": [
+        {
+          "path": "result",
+          "equals": "success"
+        }
+      ],
+      "none_of": []
+    }
+  },
+  "benign": {
+    "any_of": []
+  },
+  "protected_targets": [],
+  "target": {
+    "path": "initiatedBy.user.userPrincipalName",
+    "label": "acting user"
+  },
+  "approval": {
+    "required": true,
+    "approver_roles": [
+      "detection-owner",
+      "response-owner"
+    ],
+    "prompt": "Will revoke every sign-in session and refresh token of the acting user {target}."
+  },
+  "steps": [
+    {
+      "id": "revoke_sign_in_sessions",
+      "action": "graph:POST /users/{id}/revokeSignInSessions",
+      "params": {
+        "user": "{target}"
+      }
+    }
+  ],
+  "mode": "dry_run",
+  "live": {
+    "supported": false,
+    "required_permissions": [
+      "User.RevokeSessions.All"
+    ],
+    "note": "The Azure app holds read-only Graph scopes."
+  },
+  "audit": {
+    "index": "lab-response-audit"
+  }
+}

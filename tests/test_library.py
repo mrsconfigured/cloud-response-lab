@@ -5,6 +5,7 @@ import unittest
 from sigma.collection import SigmaCollection
 from library.build import ROOT, OUT, build, documents, evaluate, fixtures
 from library.response import propose
+from core import packs as pk
 
 NOW = dt.datetime(2026, 10, 14, 1, 0, tzinfo=dt.timezone.utc)
 
@@ -15,11 +16,11 @@ class Library(unittest.TestCase):
         for name, value in result.items():
             self.assertEqual(value, json.loads((OUT / name).read_text()), name)
         rows = result['matrix.json']
-        self.assertEqual(len(rows), 8)
-        self.assertEqual(sum(r['positive'] for r in rows), 10)
-        self.assertEqual(sum(r['negative'] for r in rows), 71)
+        self.assertEqual(len(rows), 11)
+        self.assertEqual(sum(r['positive'] for r in rows), 14)
+        self.assertEqual(sum(r['negative'] for r in rows), 101)
         self.assertEqual(sum(r['provider'] == 'aws' for r in rows), 5)
-        self.assertEqual(len(result['navigator.json']['techniques']), 5)
+        self.assertEqual(len(result['navigator.json']['techniques']), 7)
 
     def test_independent_behavior_contracts(self):
         expected = json.loads((ROOT / 'tests/fixtures/library-semantics.json').read_text())
@@ -46,10 +47,14 @@ detection:
 ''').rules[0]
         with self.assertRaises(ValueError): evaluate(rule.detection.parsed_condition[0].parsed, {'x': 'abc'})
 
-    def test_disabled_exports_and_provider_index_partition(self):
+    def test_exports_follow_pack_config_and_provider_index_partition(self):
         result = build()
+        enabled = {s for p in pk.packs(ROOT) for s in p['enabled_rules']}
+        cfg = pk.config(ROOT)['rule_defaults']
         for rule, row in zip(result['rules.json'], result['matrix.json']):
-            self.assertFalse(rule['enabled']); self.assertEqual(rule['actions'], [])
+            self.assertEqual(rule['enabled'], row['slug'] in enabled, row['slug'])
+            self.assertEqual((rule['interval'], rule['from']), (cfg['interval'], cfg['from']), row['slug'])
+            self.assertEqual(rule['actions'], [])
             self.assertEqual(rule['index'], ['logs-cloud-response-lab-library-' + row['provider']])
             self.assertFalse(row['query_engine_live'])
 

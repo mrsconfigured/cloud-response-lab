@@ -1,0 +1,67 @@
+{
+  "name": "Microsoft Entra directory audit pack",
+  "domain": "enterprise-attack",
+  "versions": {
+    "layer": "4.5",
+    "navigator": "5.1.0"
+  },
+  "description": "Green = enabled rule on a live source. Orange = rule disabled. Grey = fixture only. Mappings are hypotheses, not a coverage percentage.",
+  "techniques": [
+    {
+      "techniqueID": "T1078.004",
+      "score": 0,
+      "color": "#bdbdbd",
+      "enabled": true,
+      "comment": "Cloud Accounts | FIXTURE ONLY (Sign-in logs need Entra ID P1 or P2; no license is purchased, so these rules are tested against fixtures only.): entra-signin-impossible-travel"
+    },
+    {
+      "techniqueID": "T1098.001",
+      "score": 1,
+      "color": "#31a354",
+      "enabled": true,
+      "comment": "Additional Cloud Credentials | enabled on real data: entra-app-credential"
+    },
+    {
+      "techniqueID": "T1098.003",
+      "score": 2,
+      "color": "#31a354",
+      "enabled": true,
+      "comment": "Additional Cloud Roles | enabled on real data: entra-app-role-assignment, entra-role-member"
+    },
+    {
+      "techniqueID": "T1110",
+      "score": 0,
+      "color": "#bdbdbd",
+      "enabled": true,
+      "comment": "Brute Force | FIXTURE ONLY (Sign-in logs need Entra ID P1 or P2; no license is purchased, so these rules are tested against fixtures only.): entra-signin-brute-force"
+    },
+    {
+      "techniqueID": "T1136.003",
+      "score": 1,
+      "color": "#31a354",
+      "enabled": true,
+      "comment": "Create Account: Cloud Account | enabled on real data: entra-user-created"
+    },
+    {
+      "techniqueID": "T1528",
+      "score": 1,
+      "color": "#31a354",
+      "enabled": true,
+      "comment": "Steal Application Access Token | enabled on real data: entra-consent-granted"
+    },
+    {
+      "techniqueID": "T1556.009",
+      "score": 1,
+      "color": "#31a354",
+      "enabled": true,
+      "comment": "Conditional Access Policies | enabled on real data: entra-conditional-access-delete"
+    },
+    {
+      "techniqueID": "T1621",
+      "score": 0,
+      "color": "#bdbdbd",
+      "enabled": true,
+      "comment": "Multi-Factor Authentication Request Generation | FIXTURE ONLY (Sign-in logs need Entra ID P1 or P2; no license is purchased, so these rules are tested against fixtures only.): entra-signin-mfa-fatigue"
+    }
+  ]
+}
