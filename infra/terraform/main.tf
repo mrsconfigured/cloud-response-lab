@@ -27,17 +27,17 @@ locals {
   v1      = jsondecode(file("${path.module}/../compose.v1.json"))
   shuffle = jsondecode(file("${path.module}/../compose.staged.json"))
   manifest = {
-    mode                = "plan-only-no-deployment"
-    host                = var.existing_host_label
-    window_minutes      = var.window_minutes
-    minimum_free_ram_gib = 4
+    mode                  = "plan-only-no-deployment"
+    host                  = var.existing_host_label
+    window_minutes        = var.window_minutes
+    minimum_free_ram_gib  = 4
     minimum_free_disk_gib = 10
-    v1_compose_sha256    = filesha256("${path.module}/../compose.v1.json")
+    v1_compose_sha256     = filesha256("${path.module}/../compose.v1.json")
     staged_compose_sha256 = filesha256("${path.module}/../compose.staged.json")
-    v1_services         = keys(local.v1.services)
-    shuffle_services    = keys(local.shuffle.services)
-    preserve_volumes     = true
-    activation_blockers = ["persistent host isolation review", "secrets generated on host", "reviewed stop-before-rollback timer", "Shuffle worker isolation and execution proof"]
+    v1_services           = keys(local.v1.services)
+    shuffle_services      = keys(local.shuffle.services)
+    preserve_volumes      = true
+    activation_blockers   = ["persistent host isolation review", "secrets generated on host", "reviewed stop-before-rollback timer", "Shuffle worker isolation and execution proof"]
   }
 }
 
