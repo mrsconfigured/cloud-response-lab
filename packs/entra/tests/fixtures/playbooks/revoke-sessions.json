@@ -1,0 +1,180 @@
+{
+  "match": [
+    {
+      "name": "member added to a role by a user",
+      "alert": {
+        "alert_id": "alert-000148",
+        "rule_id": "8a7d441b-870b-4fce-bac4-000000000005",
+        "event": {
+          "id": "00000000-0000-4000-8000-000000000145",
+          "activityDateTime": "2026-10-14T19:32:04Z",
+          "loggedByService": "Core Directory",
+          "result": "success",
+          "initiatedBy": {
+            "user": {
+              "id": "00000000-0000-4000-8000-000000000146",
+              "userPrincipalName": "operator@example.invalid",
+              "ipAddress": "203.0.113.20"
+            },
+            "app": null
+          },
+          "targetResources": [
+            {
+              "id": "00000000-0000-4000-8000-000000000147",
+              "type": "ServicePrincipal",
+              "displayName": "example-app",
+              "userPrincipalName": null
+            }
+          ],
+          "category": "RoleManagement",
+          "activityDisplayName": "Add member to role"
+        }
+      }
+    },
+    {
+      "name": "user created by a user",
+      "alert": {
+        "alert_id": "alert-000152",
+        "rule_id": "8a7d441b-870b-4fce-bac4-00000000000a",
+        "event": {
+          "id": "00000000-0000-4000-8000-000000000149",
+          "activityDateTime": "2026-10-14T19:32:04Z",
+          "loggedByService": "Core Directory",
+          "result": "success",
+          "initiatedBy": {
+            "user": {
+              "id": "00000000-0000-4000-8000-000000000150",
+              "userPrincipalName": "operator@example.invalid",
+              "ipAddress": "203.0.113.20"
+            },
+            "app": null
+          },
+          "targetResources": [
+            {
+              "id": "00000000-0000-4000-8000-000000000151",
+              "type": "ServicePrincipal",
+              "displayName": "example-app",
+              "userPrincipalName": null
+            }
+          ],
+          "category": "UserManagement",
+          "activityDisplayName": "Add user"
+        }
+      }
+    }
+  ],
+  "no_match": [
+    {
+      "name": "rule not in trigger",
+      "alert": {
+        "alert_id": "alert-000156",
+        "rule_id": "8a7d441b-870b-4fce-bac4-000000000006",
+        "event": {
+          "id": "00000000-0000-4000-8000-000000000153",
+          "activityDateTime": "2026-10-14T19:32:04Z",
+          "loggedByService": "Core Directory",
+          "result": "success",
+          "initiatedBy": {
+            "user": {
+              "id": "00000000-0000-4000-8000-000000000154",
+              "userPrincipalName": "operator@example.invalid",
+              "ipAddress": "203.0.113.20"
+            },
+            "app": null
+          },
+          "targetResources": [
+            {
+              "id": "00000000-0000-4000-8000-000000000155",
+              "type": "ServicePrincipal",
+              "displayName": "example-app",
+              "userPrincipalName": null
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "failed operation",
+      "alert": {
+        "alert_id": "alert-000160",
+        "rule_id": "8a7d441b-870b-4fce-bac4-000000000005",
+        "event": {
+          "id": "00000000-0000-4000-8000-000000000157",
+          "activityDateTime": "2026-10-14T19:32:04Z",
+          "loggedByService": "Core Directory",
+          "result": "failure",
+          "initiatedBy": {
+            "user": {
+              "id": "00000000-0000-4000-8000-000000000158",
+              "userPrincipalName": "operator@example.invalid",
+              "ipAddress": "203.0.113.20"
+            },
+            "app": null
+          },
+          "targetResources": [
+            {
+              "id": "00000000-0000-4000-8000-000000000159",
+              "type": "ServicePrincipal",
+              "displayName": "example-app",
+              "userPrincipalName": null
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "actor is an app, no user to revoke",
+      "alert": {
+        "alert_id": "alert-000164",
+        "rule_id": "8a7d441b-870b-4fce-bac4-000000000005",
+        "event": {
+          "id": "00000000-0000-4000-8000-000000000161",
+          "activityDateTime": "2026-10-14T19:32:04Z",
+          "loggedByService": "Core Directory",
+          "result": "success",
+          "initiatedBy": {
+            "user": null,
+            "app": {
+              "displayName": "example-automation"
+            }
+          },
+          "targetResources": [
+            {
+              "id": "00000000-0000-4000-8000-000000000163",
+              "type": "ServicePrincipal",
+              "displayName": "example-app",
+              "userPrincipalName": null
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "actor has no UPN",
+      "alert": {
+        "alert_id": "alert-000169",
+        "rule_id": "8a7d441b-870b-4fce-bac4-00000000000a",
+        "event": {
+          "id": "00000000-0000-4000-8000-000000000166",
+          "activityDateTime": "2026-10-14T19:32:04Z",
+          "loggedByService": "Core Directory",
+          "result": "success",
+          "initiatedBy": {
+            "user": {
+              "id": "00000000-0000-4000-8000-000000000165",
+              "userPrincipalName": null
+            }
+          },
+          "targetResources": [
+            {
+              "id": "00000000-0000-4000-8000-000000000168",
+              "type": "ServicePrincipal",
+              "displayName": "example-app",
+              "userPrincipalName": null
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

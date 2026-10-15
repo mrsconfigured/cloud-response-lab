@@ -1,0 +1,6256 @@
+package shuffle
+
+import (
+	"encoding/json"
+	"encoding/xml"
+	"net/http"
+	"sync"
+	"time"
+
+	"github.com/shuffle/opensearch-go/v4/opensearchapi"
+)
+
+type AppContext struct {
+	AppName         string `json:"app_name"`
+	AppID           string `json:"app_id"`
+	ActionName      string `json:"action_name"`
+	Label           string `json:"label"`
+	ExampleResponse string `json:"example_response,omitempty" datastore:"example_response,noindex"`
+	Example         string `json:"example,omitempty" datastore:"example,noindex"`
+}
+
+type CorrelationRequest struct {
+	Type     string `json:"type"`
+	Key      string `json:"key"`
+	Category string `json:"category"`
+}
+
+type LogRequest struct {
+	Timestamp int64 `json:"timestamp"`
+
+	Method  string              `json:"method"`
+	URL     string              `json:"url"`
+	Header  map[string][]string `json:"header"`
+	Referer string              `json:"referer"`
+}
+
+type PipelineRequest struct {
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Type        string `json:"type"`
+	Command     string `json:"command"`
+	Environment string `json:"environment"`
+	WorkflowId  string `json:"workflow_id"`
+	StartNode   string `json:"start_node"`
+	Url         string `json:"url"`
+
+	PipelineId string `json:"pipeline_id"`
+	TriggerId  string `json:"trigger_id"`
+}
+
+type Pipeline struct {
+	Name        string   `json:"name" datastore:"name"`
+	ID          string   `json:"id" datastore:"id"`
+	Type        string   `json:"type" datastore:"type"`
+	Command     string   `json:"command" datastore:"command"`
+	Environment string   `json:"environment" datastore:"environment"`
+	WorkflowId  string   `json:"workflow_id" datastore:"workflow_id"`
+	StartNode   string   `json:"start_node" datastore:"start_node"`
+	OrgId       string   `json:"org_id" datastore:"org_id"`
+	Status      string   `json:"status" datastore:"status"`
+	Errors      []string `json:"errors" datastore:"errors"`
+	Url         string   `json:"url" datastore:"url"`
+	Owner       string   `json:"owner" datastore:"owner"`
+
+	PipelineId string `json:"pipeline_id" datastore:"pipeline_id"`
+	TriggerId  string `json:"trigger_id" datastore:"trigger_id"`
+}
+
+type PipelineWrapper struct {
+	Index   string   `json:"_index"`
+	Type    string   `json:"_type"`
+	ID      string   `json:"_id"`
+	Version int      `json:"_version"`
+	Found   bool     `json:"found"`
+	Source  Pipeline `json:"_source"`
+}
+
+type AllPipelinesWrapper struct {
+	Hits struct {
+		Total struct {
+			Value    int    `json:"value"`
+			Relation string `json:"relation"`
+		} `json:"total"`
+		Hits []struct {
+			Index  string   `json:"_index"`
+			ID     string   `json:"_id"`
+			Score  float64  `json:"_score"`
+			Source Pipeline `json:"_source"`
+		} `json:"hits"`
+	} `json:"hits"`
+}
+
+type QueryInput struct {
+	// Required
+	Query string `json:"query" datastore:"query,noindex"`
+
+	// Output helpers
+	Id           string `json:"id,omitempty"`
+	OutputFormat string `json:"output_format,omitempty"`
+
+	// App helpers
+	WorkflowId string                       `json:"workflow_id"`
+	AppName    string                       `json:"app_name,omitempty"`
+	AppId      string                       `json:"app_id,omitempty"`
+	Category   string                       `json:"category,omitempty"`
+	ActionName string                       `json:"action_name,omitempty"`
+	Parameters []WorkflowAppActionParameter `json:"parameters,omitempty"`
+
+	// Optional Input Parameters for more context
+	AppContext  []AppContext `json:"app_context,omitempty"`
+	UserId      string       `json:"user_id,omitempty"`
+	Username    string       `json:"username,omitempty"`
+	OrgId       string       `json:"org_id,omitempty"`
+	TimeStarted int64        `json:"time_started,omitempty"`
+	TimeEnded   int64        `json:"time_ended,omitempty"`
+	Formatting  string       `json:"formatting,omitempty"`
+	Environment string       `json:"environment,omitempty"`
+	ImageURL    string       `json:"image_url,omitempty"`
+
+	// For OpenAI assistant with Shuffle labels
+	ThreadId string `json:"thread_id,omitempty"`
+	RunId    string `json:"run_id,omitempty"`
+
+	// For responses API
+	ResponseId string `json:"response_id,omitempty"`
+
+	// For chat history storage (extending the conversations index)
+	Role           string `json:"role,omitempty" datastore:"role"`                       // "user", "assistant", or "system"
+	Response       string `json:"response,omitempty" datastore:"response,noindex"`       // AI's response content
+	ConversationId string `json:"conversation_id,omitempty" datastore:"conversation_id"` // Groups all messages in one chat together
+
+}
+
+type AtomicOutput struct {
+	Success bool   `json:"success"`
+	Reason  string `json:"reason"`
+
+	ThreadId   string `json:"thread_id"`              // Thread the assistant ran
+	RunId      string `json:"run_id"`                 // Run ID for the thread
+	ToolCallID string `json:"tool_call_id,omitempty"` // Result inside the run
+
+	ResponseId     string `json:"response_id,omitempty"`     // Response ID
+	ConversationId string `json:"conversation_id,omitempty"` // Conversation ID
+}
+
+type ExecutionRequestWrapper struct {
+	Data []ExecutionRequest `json:"data"`
+}
+
+type ExecutionRequest struct {
+	ExecutionId       string   `json:"execution_id"`
+	ExecutionArgument string   `json:"execution_argument"`
+	ExecutionSource   string   `json:"execution_source"`
+	WorkflowId        string   `json:"workflow_id"`
+	Environments      []string `json:"environments"`
+	Authorization     string   `json:"authorization"`
+	Status            string   `json:"status"`
+	Start             string   `json:"start"`
+	Type              string   `json:"type"`
+	Priority          int64    `json:"priority" datastore:"priority" yaml:"priority"` // Mapped back to workflowexecutions' priority
+
+	CreatedAt int64  `json:"created_at" datastore:"created_at"`
+	Authgroup string `json:"authgroup" datastore:"authgroup"`
+}
+
+type RetStruct struct {
+	Success          bool                  `json:"success"`
+	SyncFeatures     SyncFeatures          `json:"sync_features"`
+	SessionKey       string                `json:"session_key"`
+	IntervalSeconds  int64                 `json:"interval_seconds"`
+	Subscriptions    []PaymentSubscription `json:"subscriptions,omitempty"`
+	Licensed         bool                  `json:"licensed"`
+	CloudSyncUrl     string                `json:"cloud_sync_url,omitempty"`
+	AppRunsHardLimit int64                 `json:"app_runs_hard_limit"`
+	WorkflowBackup   bool                  `json:"workflow_backup"`
+	AppBackup        bool                  `json:"app_backup"`
+	AiCloudSync      bool                  `json:"ai_cloud_sync"`
+
+	WorkflowBackupUpdated int64 `json:"workflow_backup_updated"`
+	AppBackupUpdated      int64 `json:"app_backup_updated"`
+	AiCloudSyncUpdated    int64 `json:"ai_cloud_sync_updated"`
+}
+
+type AppMini struct {
+	Id                     string         `json:"id"`
+	Name                   string         `json:"name"`
+	Version                string         `json:"version"`
+	LargeImage             string         `json:"large_image"`
+	Authentication         Authentication `json:"authentication"`
+	AuthenticationRequired bool           `json:"authentication_required"`
+
+	ActionName string `json:"action_name,omitempty"`
+	Category   string `json:"category,omitempty"`
+}
+
+type WorkflowApp struct {
+	Name        string `json:"name" yaml:"name" required:true datastore:"name"`
+	AppVersion  string `json:"app_version" yaml:"app_version" required:true datastore:"app_version"`
+	ID          string `json:"id" yaml:"id,omitempty" required:false datastore:"id"`
+	Link        string `json:"link" yaml:"link" required:false datastore:"link,noindex"`
+	IsValid     bool   `json:"is_valid" yaml:"is_valid" required:true datastore:"is_valid"`
+	Generated   bool   `json:"generated" yaml:"generated" required:false datastore:"generated"`
+	Downloaded  bool   `json:"downloaded" yaml:"downloaded" required:false datastore:"downloaded"`
+	Sharing     bool   `json:"sharing" yaml:"sharing" required:false datastore:"sharing"`
+	Verified    bool   `json:"verified" yaml:"verified" required:false datastore:"verified"`
+	Invalid     bool   `json:"invalid" yaml:"invalid" required:false datastore:"invalid"`
+	Activated   bool   `json:"activated" yaml:"activated" required:false datastore:"activated"`
+	Tested      bool   `json:"tested" yaml:"tested" required:false datastore:"tested"`
+	Hash        string `json:"hash" datastore:"hash" yaml:"hash"` // api.yaml+dockerfile+src/app.py for apps
+	PrivateID   string `json:"private_id" yaml:"private_id" required:false datastore:"private_id"`
+	Environment string `json:"environment" datastore:"environment" required:true yaml:"environment"`
+	SmallImage  string `json:"small_image" datastore:"small_image,noindex" required:false yaml:"small_image"`
+	LargeImage  string `json:"large_image" datastore:"large_image,noindex" yaml:"large_image" required:false`
+	ContactInfo struct {
+		Name string `json:"name" datastore:"name" yaml:"name"`
+		Url  string `json:"url" datastore:"url" yaml:"url"`
+	} `json:"contact_info" datastore:"contact_info" yaml:"contact_info" required:false`
+	FolderMount struct {
+		FolderMount       bool   `json:"folder_mount" datastore:"folder_mount"`
+		SourceFolder      string `json:"source_folder" datastore:"source_folder"`
+		DestinationFolder string `json:"destination_folder" datastore:"destination_folder"`
+	} `json:"folder_mount" datastore:"folder_mount"`
+	Authentication           Authentication      `json:"authentication" yaml:"authentication" required:false datastore:"authentication"`
+	Actions                  []WorkflowAppAction `json:"actions" yaml:"actions" required:true datastore:"actions,noindex"`
+	Tags                     []string            `json:"tags" yaml:"tags" required:false datastore:"activated"`
+	Categories               []string            `json:"categories" yaml:"categories" required:false datastore:"categories"`
+	Created                  int64               `json:"created" datastore:"created"`
+	Edited                   int64               `json:"edited" datastore:"edited"`
+	LastRuntime              int64               `json:"last_runtime" datastore:"last_runtime"`
+	Versions                 []AppVersion        `json:"versions" datastore:"versions"`
+	LoopVersions             []string            `json:"loop_versions" datastore:"loop_versions"`
+	Owner                    string              `json:"owner" datastore:"owner" yaml:"owner"`
+	SharingConfig            string              `json:"sharing_config" yaml:"sharing_config" datastore:"sharing_config"`
+	Public                   bool                `json:"public" datastore:"public"`
+	PublishedId              string              `json:"published_id" datastore:"published_id"`
+	ChildIds                 []string            `json:"child_ids" datastore:"child_ids"`
+	ReferenceOrg             string              `json:"reference_org" datastore:"reference_org"`
+	ReferenceUrl             string              `json:"reference_url" datastore:"reference_url"`
+	ActionFilePath           string              `json:"action_file_path" datastore:"action_file_path"`
+	ImageFilePath            string              `json:"image_file_path" datastore:"image_file_path"`
+	Template                 bool                `json:"template" datastore:"template,noindex"`
+	Documentation            string              `json:"documentation" datastore:"documentation,noindex"`
+	Description              string              `json:"description" datastore:"description,noindex"`
+	DocumentationDownloadUrl string              `json:"documentation_download_url" datastore:"documentation_download_url"`
+	PrimaryUsecases          []string            `json:"primary_usecases" yaml:"primary_usecases"  datastore:"primary_usecases"`
+
+	SkippedBuild bool `json:"skipped_build" yaml:"skipped_build" required:false datastore:"skipped_build"`
+	//SelectedTemplate WorkflowApp         `json:"selected_template" datastore:"selected_template,noindex"`
+
+	ReferenceInfo struct {
+		OnpremBackup bool `json:"onprem_backup" datastore:"onprem_backup"`
+
+		IsPartner        bool     `json:"is_partner" datastore:"is_partner"`
+		PartnerContacts  string   `json:"partner_contacts" datastore:"partner_contacts"`
+		DocumentationUrl string   `json:"documentation_url" datastore:"documentation_url"`
+		GithubUrl        string   `json:"github_url" datastore:"github_url"`
+		Triggers         []string `json:"triggers" datastore:"triggers"`
+	} `json:"reference_info" datastore:"reference_info"`
+	Blogpost   string `json:"blogpost" yaml:"blogpost" datastore:"blogpost"`
+	Video      string `json:"video" yaml:"video" datastore:"video"`
+	CompanyURL string `json:"company_url" datastore:"company_url" required:false yaml:"company_url"`
+
+	Contributors []string `json:"contributors" datastore:"contributors"`
+	RevisionId   string   `json:"revision_id" datastore:"revision_id"`
+	Collection   string   `json:"collection" datastore:"collection"`
+}
+
+type AppVersion struct {
+	Version string `json:"version" datastore:"version"`
+	ID      string `json:"id" datastore:"id"`
+}
+
+type WorkflowAppActionParameter struct {
+	Description    string           `json:"description" datastore:"description,noindex" yaml:"description"`
+	ID             string           `json:"id" datastore:"id" yaml:"id,omitempty"`
+	Name           string           `json:"name" datastore:"name" yaml:"name"`
+	Example        string           `json:"example" datastore:"example,noindex" yaml:"example"`
+	Value          string           `json:"value" datastore:"value,noindex" yaml:"value,omitempty"`
+	Multiline      bool             `json:"multiline" datastore:"multiline" yaml:"multiline"`
+	Multiselect    bool             `json:"multiselect" datastore:"multiselect" yaml:"multiselect"`
+	Options        []string         `json:"options" datastore:"options" yaml:"options"`
+	ActionField    string           `json:"action_field" datastore:"action_field" yaml:"actionfield,omitempty"`
+	Variant        string           `json:"variant" datastore:"variant" yaml:"variant,omitempty"`
+	Required       bool             `json:"required" datastore:"required" yaml:"required"`
+	Configuration  bool             `json:"configuration" datastore:"configuration" yaml:"configuration"`
+	Tags           []string         `json:"tags" datastore:"tags" yaml:"tags"`
+	Schema         SchemaDefinition `json:"schema" datastore:"schema" yaml:"schema"`
+	SkipMulticheck bool             `json:"skip_multicheck" datastore:"skip_multicheck" yaml:"skip_multicheck"`
+	CustomValue    bool             `json:"custom_value" datastore:"custom_value" yaml:"custom_value"`
+	ValueReplace   []Valuereplace   `json:"value_replace" datastore:"value_replace,noindex" yaml:"value_replace,omitempty"`
+	UniqueToggled  bool             `json:"unique_toggled" datastore:"unique_toggled" yaml:"unique_toggled"`
+	Error          string           `json:"error" datastore:"error" yaml:"error"`
+	Hidden         bool             `json:"hidden" datastore:"hidden" yaml:"hidden"`
+}
+
+type Valuereplace struct {
+	Key   string `json:"key" datastore:"key" yaml:"key"`
+	Value string `json:"value" datastore:"value,noindex" yaml:"value"`
+
+	// Used for e.g. user input storage
+	Answer   string `json:"answer,omitempty" datastore:"answer,noindex" yaml:"answer,omitempty"`
+	Question string `json:"question,omitempty" datastore:"question,noindex" yaml:"question,omitempty"`
+}
+
+type WorkflowAppAction struct {
+	Description       string                       `json:"description" datastore:"description,noindex"`
+	ID                string                       `json:"id" datastore:"id" yaml:"id,omitempty"`
+	Name              string                       `json:"name" datastore:"name"`
+	AppID             string                       `json:"app_id" datastore:"app_id"`
+	AppName           string                       `json:"app_name,omitempty" datastore:"app_name"`
+	AppVersion        string                       `json:"app_version,omitempty" datastore:"app_version"`
+	Label             string                       `json:"label" datastore:"label"`
+	NodeType          string                       `json:"node_type" datastore:"node_type"`
+	Environment       string                       `json:"environment" datastore:"environment"`
+	Sharing           bool                         `json:"sharing" datastore:"sharing"`
+	PrivateID         string                       `json:"private_id" datastore:"private_id"`
+	PublicID          string                       `json:"public_id" datastore:"public_id"`
+	Tags              []string                     `json:"tags" datastore:"tags" yaml:"tags"`
+	LargeImage        string                       `json:"large_image" datastore:"large_image"`
+	Authentication    []AuthenticationStore        `json:"authentication" datastore:"authentication,noindex" yaml:"authentication,omitempty"`
+	Tested            bool                         `json:"tested" datastore:"tested" yaml:"tested"`
+	Parameters        []WorkflowAppActionParameter `json:"parameters" datastore: "parameters"`
+	InvalidParameters []WorkflowAppActionParameter `json:"previous_parameters,omitempty" datastore: "previous_parameters,noindex"`
+	ExecutionVariable Variable                     `json:"execution_variable" datastore:"execution_variables"`
+	Returns           struct {
+		Description string           `json:"description" datastore:"returns" yaml:"description,omitempty"`
+		Example     string           `json:"example" datastore:"example,noindex" yaml:"example"`
+		ID          string           `json:"id" datastore:"id" yaml:"id,omitempty"`
+		Schema      SchemaDefinition `json:"schema" datastore:"schema" yaml:"schema"`
+	} `json:"returns" datastore:"returns"`
+	AuthenticationId   string   `json:"authentication_id" datastore:"authentication_id"`
+	Example            string   `json:"example,noindex" datastore:"example" yaml:"example"`
+	AuthNotRequired    bool     `json:"auth_not_required" datastore:"auth_not_required" yaml:"auth_not_required"`
+	SourceWorkflow     string   `json:"source_workflow" yaml:"source_workflow" datastore:"source_workflow"`
+	RunMagicOutput     bool     `json:"run_magic_output" datastore:"run_magic_output" yaml:"run_magic_output"`
+	RunMagicInput      bool     `json:"run_magic_input" datastore:"run_magic_input" yaml:"run_magic_input"`
+	ExecutionDelay     int64    `json:"execution_delay" datastore:"execution_delay"`
+	RequiredBodyFields []string `json:"required_body_fields" datastore:"required_body_fields"`
+	CategoryLabel      []string `json:"category_label" datastore:"category_label"`
+	ExampleResponse    string   `json:"example_response" datastore:"example_response"`
+}
+
+type Authentication struct {
+	Type         string                 `json:"type" datastore:"type" yaml:"type"`
+	Required     bool                   `json:"required" datastore:"required" yaml:"required" `
+	Parameters   []AuthenticationParams `json:"parameters" datastore:"parameters" yaml:"parameters"`
+	RedirectUri  string                 `json:"redirect_uri" datastore:"redirect_uri" yaml:"redirect_uri"`
+	TokenUri     string                 `json:"token_uri" datastore:"token_uri" yaml:"token_uri"`
+	RefreshUri   string                 `json:"refresh_uri" datastore:"refresh_uri" yaml:"refresh_uri"`
+	Scope        []string               `json:"scope" datastore:"scope" yaml:"scope"`
+	ClientId     string                 `json:"client_id" datastore:"client_id"`
+	ClientSecret string                 `json:"client_secret" datastore:"client_secret"`
+	GrantType    string                 `json:"grant_type" datastore:"grant_type"`
+}
+
+type AuthenticationStore struct {
+	Key   string `json:"key" datastore:"key"`
+	Value string `json:"value" datastore:"value,noindex"`
+}
+
+type AuthenticationParams struct {
+	Description string           `json:"description" datastore:"description,noindex" yaml:"description"`
+	ID          string           `json:"id" datastore:"id" yaml:"id"`
+	Name        string           `json:"name" datastore:"name" yaml:"name"`
+	Example     string           `json:"example" datastore:"example,noindex" yaml:"example"`
+	Value       string           `json:"value,omitempty" datastore:"value,noindex" yaml:"value"`
+	Multiline   bool             `json:"multiline" datastore:"multiline" yaml:"multiline"`
+	Required    bool             `json:"required" datastore:"required" yaml:"required"`
+	In          string           `json:"in" datastore:"in" yaml:"in"`
+	Schema      SchemaDefinition `json:"schema" datastore:"schema" yaml:"schema"`
+	Scheme      string           `json:"scheme" datastore:"scheme" yaml:"scheme"` // Deprecated
+}
+
+type AppExecutionExample struct {
+	AppName         string   `json:"app_name" datastore:"app_name"`
+	AppVersion      string   `json:"app_version" datastore:"app_version"`
+	AppAction       string   `json:"app_action" datastore:"app_action"`
+	AppId           string   `json:"app_id" datastore:"app_id"`
+	ExampleId       string   `json:"example_id" datastore:"example_id"`
+	SuccessExamples []string `json:"success_examples" datastore:"success_examples,noindex"`
+	FailureExamples []string `json:"failure_examples" datastore:"failure_examples,noindex"`
+}
+
+type SchemaDefinition struct {
+	Type string `json:"type" datastore:"type"`
+	Name string `json:"name,omitempty" datastore:"name"`
+}
+
+type Userapi struct {
+	Username string `datastore:"Username"`
+	ApiKey   string `datastore:"apikey"`
+}
+
+type AppUsage struct {
+	AppName string `json:"app_name" datastore:"app_name"`
+	AppId   string `json:"app_id" datastore:"app_id"`
+	Usage   int64  `json:"usage" datastore:"usage"`
+}
+
+type IncrementInCache struct {
+	Amount    uint64 `json:"amount" datastore:"amount"`
+	CreatedAt int64  `json:"created_at" datastore:"created_at"`
+}
+
+// Should be for a particular day
+// Reset is handled during caching. If the date is not today, then the reset is handled
+type DailyStatistics struct {
+	Date time.Time `json:"date" datastore:"date"`
+
+	AppExecutions                     int64 `json:"app_executions" datastore:"app_executions"`
+	ChildAppExecutions                int64 `json:"child_app_executions" datastore:"child_app_executions"`
+	AppExecutionsFailed               int64 `json:"app_executions_failed" datastore:"app_executions_failed"`
+	SubflowExecutions                 int64 `json:"subflow_executions" datastore:"subflow_executions"`
+	WorkflowExecutions                int64 `json:"workflow_executions" datastore:"workflow_executions"`
+	WorkflowExecutionsFinished        int64 `json:"workflow_executions_finished" datastore:"workflow_executions_finished"`
+	WorkflowExecutionsFailed          int64 `json:"workflow_executions_failed" datastore:"workflow_executions_failed"`
+	OrgSyncActions                    int64 `json:"org_sync_actions" datastore:"org_sync_actions"`
+	CloudExecutions                   int64 `json:"cloud_executions" datastore:"cloud_executions"`
+	OnpremExecutions                  int64 `json:"onprem_executions" datastore:"onprem_executions"`
+	AIUsage                           int64 `json:"ai_executions" datastore:"ai_executions"`
+	AgentExecutions                   int64 `json:"agent_executions" datastore:"agent_executions"`
+	AgentExecutionsSuccessful         int64 `json:"agent_executions_successful" datastore:"agent_executions_successful"`
+	AgentExecutionsFailed             int64 `json:"agent_executions_failed" datastore:"agent_executions_failed"`
+	AgentTokens                       int64 `json:"agent_tokens" datastore:"agent_tokens"`
+	AgentInputTokens                  int64 `json:"agent_input_tokens" datastore:"agent_input_tokens"`
+	AgentOutputTokens                 int64 `json:"agent_output_tokens" datastore:"agent_output_tokens"`
+	AgentCachedTokens                 int64 `json:"agent_cached_tokens" datastore:"agent_cached_tokens"`
+	LLMTokens                         int64 `json:"llm_tokens" datastore:"llm_tokens"`
+	ChildOrgLLMTokens                 int64 `json:"child_org_llm_tokens" datastore:"child_org_llm_tokens"`
+	DailySMSUsage                     int64 `json:"daily_sms_usage" datastore:"daily_sms_usage"`
+	DailyChildOrgSMSUsage             int64 `json:"daily_child_org_sms_usage" datastore:"daily_child_org_sms_usage"`
+	DailyEmailUsage                   int64 `json:"daily_email_usage" datastore:"daily_email_usage"`
+	DailyChildOrgEmailUsage           int64 `json:"daily_child_org_email_usage" datastore:"daily_child_org_email_usage"`
+	ChildOrgAgentExecutions           int64 `json:"child_org_agent_executions" datastore:"child_org_agent_executions"`
+	ChildOrgAgentTokens               int64 `json:"child_org_agent_tokens" datastore:"child_org_agent_tokens"`
+	ChildOrgAgentInputTokens          int64 `json:"child_org_agent_input_tokens" datastore:"child_org_agent_input_tokens"`
+	ChildOrgAgentOutputTokens         int64 `json:"child_org_agent_output_tokens" datastore:"child_org_agent_output_tokens"`
+	ChildOrgAiUsage                   int64 `json:"child_org_ai_usage" datastore:"child_org_ai_usage"`
+	AgentMaxLoopsHit                  int64 `json:"agent_max_loops_hit" datastore:"agent_max_loops_hit"`
+	ChildOrgAgentMaxLoopsHit          int64 `json:"child_org_agent_max_loops_hit" datastore:"child_org_agent_max_loops_hit"`
+	ChildOrgAgentExecutionsSuccessful int64 `json:"child_org_agent_executions_successful" datastore:"child_org_agent_executions_successful"`
+	ChildOrgAgentExecutionsFailed     int64 `json:"child_org_agent_executions_failed" datastore:"child_org_agent_executions_failed"`
+	ChildOrgAgentCachedTokens         int64 `json:"child_org_agent_cached_tokens" datastore:"child_org_agent_cached_tokens"`
+
+	ApiUsage int64      `json:"api_usage" datastore:"api_usage"`
+	AppUsage []AppUsage `json:"app_usage" datastore:"app_usage"`
+
+	Additions []AdditionalUseConfig `json:"additions,omitempty" datastore:"additions"`
+}
+
+type Tenants struct {
+	Name      string    `json:"name" datastore:"name"`
+	Id        string    `json:"id" datastore:"id"`
+	CreatedAt time.Time `json:"created_at" datastore:"created_at"`
+	DeletedAt time.Time `json:"deleted_at" datastore:"deleted_at"`
+	Status    string    `json:"status" datastore:"status"`
+}
+
+type Locations struct {
+	OrgId     string `json:"org_id"`
+	OrgName   string `json:"org_name"`
+	Name      string `json:"name"`
+	Id        string `json:"id"`
+	CreatedAt string `json:"created_at"`
+	DeletedAt string `json:"deleted_at"`
+	Status    string `json:"status"`
+}
+
+// Used to be related to users, now related to orgs.
+// Not directly, but being updated by org actions
+type ExecutionInfo struct {
+	// These have been configured for cache updates in db-connector.go with 5 hour (300 minutes) timeouts before dumping
+	OrgId   string `json:"org_id" datastore:"org_id"`
+	OrgName string `json:"org_name" datastore:"org_name"`
+
+	LastCleared int64 `json:"last_cleared" datastore:"last_cleared"`
+
+	DailyStatistics []DailyStatistics `json:"daily_statistics" datastore:"daily_statistics"`
+	OnpremStats     []DailyStatistics `json:"onprem_stats,omitempty" datastore:"onprem_stats"`
+
+	TotalAppExecutions                     int64 `json:"total_app_executions" datastore:"total_app_executions"`
+	TotalChildAppExecutions                int64 `json:"total_child_app_executions" datastore:"total_child_app_executions"`
+	TotalAppExecutionsFailed               int64 `json:"total_app_executions_failed" datastore:"total_app_executions_failed"`
+	TotalSubflowExecutions                 int64 `json:"total_subflow_executions" datastore:"total_subflow_executions"`
+	TotalWorkflowExecutions                int64 `json:"total_workflow_executions" datastore:"total_workflow_executions"`
+	TotalWorkflowExecutionsFinished        int64 `json:"total_workflow_executions_finished" datastore:"total_workflow_executions_finished"`
+	TotalWorkflowExecutionsFailed          int64 `json:"total_workflow_executions_failed" datastore:"total_workflow_executions_failed"`
+	TotalOrgSyncActions                    int64 `json:"total_org_sync_actions" datastore:"total_org_sync_actions"`
+	TotalCloudExecutions                   int64 `json:"total_cloud_executions" datastore:"total_cloud_executions"`
+	TotalOnpremExecutions                  int64 `json:"total_onprem_executions" datastore:"total_onprem_executions"`
+	TotalAIUsage                           int64 `json:"total_ai_executions" datastore:"total_ai_executions"`
+	TotalAgentExecutions                   int64 `json:"total_agent_executions" datastore:"total_agent_executions"`
+	TotalAgentExecutionsSuccessful         int64 `json:"total_agent_executions_successful" datastore:"total_agent_executions_successful"`
+	TotalAgentExecutionsFailed             int64 `json:"total_agent_executions_failed" datastore:"total_agent_executions_failed"`
+	TotalLLMTokens                         int64 `json:"total_llm_tokens" datastore:"total_llm_tokens"`
+	TotalChildOrgLLMTokens                 int64 `json:"total_child_org_llm_tokens" datastore:"total_child_org_llm_tokens"`
+	TotalAgentTokens                       int64 `json:"total_agent_tokens" datastore:"total_agent_tokens"`
+	TotalAgentInputTokens                  int64 `json:"total_agent_input_tokens" datastore:"total_agent_input_tokens"`
+	TotalAgentOutputTokens                 int64 `json:"total_agent_output_tokens" datastore:"total_agent_output_tokens"`
+	TotalAgentMaxLoopsHit                  int64 `json:"total_agent_max_loops_hit" datastore:"total_agent_max_loops_hit"`
+	TotalChildOrgAgentExecutionsSuccessful int64 `json:"total_child_org_agent_executions_successful" datastore:"total_child_org_agent_executions_successful"`
+	TotalChildOrgAgentExecutionsFailed     int64 `json:"total_child_org_agent_executions_failed" datastore:"total_child_org_agent_executions_failed"`
+	TotalChildOrgAgentCachedTokens         int64 `json:"total_child_org_agent_cached_tokens" datastore:"total_child_org_agent_cached_tokens"`
+	TotalChildOrgAgentMaxLoopsHit          int64 `json:"total_child_org_agent_max_loops_hit" datastore:"total_child_org_agent_max_loops_hit"`
+	TotalAgentCachedTokens                 int64 `json:"total_agent_cached_tokens" datastore:"total_agent_cached_tokens"`
+	TotalChildOrgAiUsage                   int64 `json:"total_child_org_ai_usage" datastore:"total_child_org_ai_usage"`
+	TotalChildOrgAgentExecutions           int64 `json:"total_child_org_agent_executions" datastore:"total_child_org_agent_executions"`
+	TotalChildOrgAgentTokens               int64 `json:"total_child_org_agent_tokens" datastore:"total_child_org_agent_tokens"`
+	TotalChildOrgAgentInputTokens          int64 `json:"total_child_org_agent_input_tokens" datastore:"total_child_org_agent_input_tokens"`
+	TotalChildOrgAgentOutputTokens         int64 `json:"total_child_org_agent_output_tokens" datastore:"total_child_org_agent_output_tokens"`
+	TotalChildWorkflowExecutions           int64 `json:"total_child_workflow_executions" datastore:"total_child_workflow_executions"`
+	TotalSMSUsage                          int64 `json:"total_sms_usage" datastore:"total_sms_usage"`
+	TotalChildOrgSMSUsage                  int64 `json:"total_child_org_sms_usage" datastore:"total_child_org_sms_usage"`
+	TotalEmailUsage                        int64 `json:"total_email_usage" datastore:"total_email_usage"`
+	TotalChildOrgEmailUsage                int64 `json:"total_child_org_email_usage" datastore:"total_child_org_email_usage"`
+
+	MonthlyApiUsage                          int64 `json:"monthly_api_usage,omitempty" datastore:"monthly_api_usage"`
+	MonthlyChildAppExecutions                int64 `json:"monthly_child_app_executions,omitempty" datastore:"monthly_child_app_executions"`
+	MonthlyAppExecutions                     int64 `json:"monthly_app_executions,omitempty" datastore:"monthly_app_executions"`
+	MonthlyAppExecutionsFailed               int64 `json:"monthly_app_executions_failed,omitempty" datastore:"monthly_app_executions_failed"`
+	MonthlySubflowExecutions                 int64 `json:"monthly_subflow_executions,omitempty" datastore:"monthly_subflow_executions"`
+	MonthlyWorkflowExecutions                int64 `json:"monthly_workflow_executions,omitempty" datastore:"monthly_workflow_executions"`
+	MonthlyChildWorkflowExecutions           int64 `json:"monthly_child_workflow_executions,omitempty" datastore:"monthly_child_workflow_executions"`
+	MonthlyWorkflowExecutionsFinished        int64 `json:"monthly_workflow_executions_finished,omitempty" datastore:"monthly_workflow_executions_finished"`
+	MonthlyWorkflowExecutionsFailed          int64 `json:"monthly_workflow_executions_failed,omitempty" datastore:"monthly_workflow_executions_failed"`
+	MonthlyOrgSyncActions                    int64 `json:"monthly_org_sync_actions,omitempty" datastore:"monthly_org_sync_actions"`
+	MonthlyCloudExecutions                   int64 `json:"monthly_cloud_executions,omitempty" datastore:"monthly_cloud_executions"`
+	MonthlyOnpremExecutions                  int64 `json:"monthly_onprem_executions,omitempty" datastore:"monthly_onprem_executions"`
+	MonthlyAIUsage                           int64 `json:"monthly_ai_executions,omitempty" datastore:"monthly_ai_executions"`
+	MonthlyAgentExecutions                   int64 `json:"monthly_agent_executions,omitempty" datastore:"monthly_agent_executions"`
+	MonthlyAgentExecutionsSuccessful         int64 `json:"monthly_agent_executions_successful,omitempty" datastore:"monthly_agent_executions_successful"`
+	MonthlyAgentExecutionsFailed             int64 `json:"monthly_agent_executions_failed,omitempty" datastore:"monthly_agent_executions_failed"`
+	MonthlyLLMTokens                         int64 `json:"monthly_llm_tokens,omitempty" datastore:"monthly_llm_tokens"`
+	MonthlyAgentTokens                       int64 `json:"monthly_agent_tokens,omitempty" datastore:"monthly_agent_tokens"`
+	MonthlyAgentInputTokens                  int64 `json:"monthly_agent_input_tokens,omitempty" datastore:"monthly_agent_input_tokens"`
+	MonthlyAgentOutputTokens                 int64 `json:"monthly_agent_output_tokens,omitempty" datastore:"monthly_agent_output_tokens"`
+	MonthlyAgentCachedTokens                 int64 `json:"monthly_agent_cached_tokens,omitempty" datastore:"monthly_agent_cached_tokens"`
+	MonthlyAgentMaxLoopsHit                  int64 `json:"monthly_agent_max_loops_hit,omitempty" datastore:"monthly_agent_max_loops_hit"`
+	MonthlyChildOrgAiUsage                   int64 `json:"monthly_child_org_ai_usage,omitempty" datastore:"monthly_child_org_ai_usage"`
+	MonthlyChildOrgAgentExecutions           int64 `json:"monthly_child_org_agent_executions,omitempty" datastore:"monthly_child_org_agent_executions"`
+	MonthlyChildOrgAgentExecutionsSuccessful int64 `json:"monthly_child_org_agent_executions_successful,omitempty" datastore:"monthly_child_org_agent_executions_successful"`
+	MonthlyChildOrgAgentExecutionsFailed     int64 `json:"monthly_child_org_agent_executions_failed,omitempty" datastore:"monthly_child_org_agent_executions_failed"`
+	MonthlyChildOrgLLMTokens                 int64 `json:"monthly_child_org_llm_tokens,omitempty" datastore:"monthly_child_org_llm_tokens"`
+	MonthlyChildOrgAgentTokens               int64 `json:"monthly_child_org_agent_tokens,omitempty" datastore:"monthly_child_org_agent_tokens"`
+	MonthlyChildOrgAgentInputTokens          int64 `json:"monthly_child_org_agent_input_tokens,omitempty" datastore:"monthly_child_org_agent_input_tokens"`
+	MonthlyChildOrgAgentOutputTokens         int64 `json:"monthly_child_org_agent_output_tokens,omitempty" datastore:"monthly_child_org_agent_output_tokens"`
+	MonthlyChildOrgAgentCachedTokens         int64 `json:"monthly_child_org_agent_cached_tokens,omitempty" datastore:"monthly_child_org_agent_cached_tokens"`
+	MonthlyChildOrgAgentMaxLoopsHit          int64 `json:"monthly_child_org_agent_max_loops_hit,omitempty" datastore:"monthly_child_org_agent_max_loops_hit"`
+	MonthlySMSUsage                          int64 `json:"monthly_sms_usage,omitempty" datastore:"monthly_sms_usage"`
+	MonthlyChildOrgSMSUsage                  int64 `json:"monthly_child_org_sms_usage,omitempty" datastore:"monthly_child_org_sms_usage"`
+	MonthlyEmailUsage                        int64 `json:"monthly_email_usage,omitempty" datastore:"monthly_email_usage"`
+	MonthlyChildOrgEmailUsage                int64 `json:"monthly_child_org_email_usage,omitempty" datastore:"monthly_child_org_email_usage"`
+
+	WeeklyAppExecutions              int64 `json:"weekly_app_executions,omitempty" datastore:"weekly_app_executions"`
+	WeeklyChildAppExecutions         int64 `json:"weekly_child_app_executions,omitempty" datastore:"weekly_child_app_executions"`
+	WeeklyAppExecutionsFailed        int64 `json:"weekly_app_executions_failed,omitempty" datastore:"weekly_app_executions_failed"`
+	WeeklySubflowExecutions          int64 `json:"weekly_subflow_executions,omitempty" datastore:"weekly_subflow_executions"`
+	WeeklyWorkflowExecutions         int64 `json:"weekly_workflow_executions,omitempty" datastore:"weekly_workflow_executions"`
+	WeeklyChildWorkflowExecutions    int64 `json:"weekly_child_workflow_executions,omitempty" datastore:"weekly_child_workflow_executions"`
+	WeeklyWorkflowExecutionsFinished int64 `json:"weekly_workflow_executions_finished,omitempty" datastore:"weekly_workflow_executions_finished"`
+	WeeklyWorkflowExecutionsFailed   int64 `json:"weekly_workflow_executions_failed,omitempty" datastore:"weekly_workflow_executions_failed"`
+	WeeklyOrgSyncActions             int64 `json:"weekly_org_sync_actions,omitempty" datastore:"weekly_org_sync_actions"`
+	WeeklyCloudExecutions            int64 `json:"weekly_cloud_executions,omitempty" datastore:"weekly_cloud_executions"`
+	WeeklyOnpremExecutions           int64 `json:"weekly_onprem_executions,omitempty" datastore:"weekly_onprem_executions"`
+	WeeklyAIUsage                    int64 `json:"weekly_ai_executions,omitempty" datastore:"weekly_ai_executions"`
+
+	DailyAppExecutions                     int64 `json:"daily_app_executions" datastore:"daily_app_executions"`
+	DailyChildAppExecutions                int64 `json:"daily_child_app_executions" datastore:"daily_child_app_executions"`
+	DailyAppExecutionsFailed               int64 `json:"daily_app_executions_failed" datastore:"daily_app_executions_failed"`
+	DailySubflowExecutions                 int64 `json:"daily_subflow_executions" datastore:"daily_subflow_executions"`
+	DailyWorkflowExecutions                int64 `json:"daily_workflow_executions" datastore:"daily_workflow_executions"`
+	DailyChildWorkflowExecutions           int64 `json:"daily_child_workflow_executions" datastore:"daily_child_workflow_executions"`
+	DailyWorkflowExecutionsFinished        int64 `json:"daily_workflow_executions_finished" datastore:"daily_workflow_executions_finished"`
+	DailyWorkflowExecutionsFailed          int64 `json:"daily_workflow_executions_failed" datastore:"daily_workflow_executions_failed"`
+	DailyOrgSyncActions                    int64 `json:"daily_org_sync_actions" datastore:"daily_org_sync_actions"`
+	DailyCloudExecutions                   int64 `json:"daily_cloud_executions" datastore:"daily_cloud_executions"`
+	DailyOnpremExecutions                  int64 `json:"daily_onprem_executions" datastore:"daily_onprem_executions"`
+	DailyAIUsage                           int64 `json:"daily_ai_executions" datastore:"daily_ai_executions"`
+	DailyAgentExecutions                   int64 `json:"daily_agent_executions" datastore:"daily_agent_executions"`
+	DailyAgentExecutionsSuccessful         int64 `json:"daily_agent_executions_successful" datastore:"daily_agent_executions_successful"`
+	DailyAgentExecutionsFailed             int64 `json:"daily_agent_executions_failed" datastore:"daily_agent_executions_failed"`
+	DailyLLMTokens                         int64 `json:"daily_llm_tokens" datastore:"daily_llm_tokens"`
+	DailyAgentTokens                       int64 `json:"daily_agent_tokens" datastore:"daily_agent_tokens"`
+	DailyAgentCachedTokens                 int64 `json:"daily_agent_cached_tokens" datastore:"daily_agent_cached_tokens"`
+	DailyAgentMaxLoopsHit                  int64 `json:"daily_agent_max_loops_hit,omitempty" datastore:"daily_agent_max_loops_hit"`
+	DailyAgentInputTokens                  int64 `json:"daily_agent_input_tokens" datastore:"daily_agent_input_tokens"`
+	DailyAgentOutputTokens                 int64 `json:"daily_agent_output_tokens" datastore:"daily_agent_output_tokens"`
+	DailyChildOrgAiUsage                   int64 `json:"daily_child_org_ai_usage" datastore:"daily_child_org_ai_usage"`
+	DailyChildOrgAgentExecutions           int64 `json:"daily_child_org_agent_executions" datastore:"daily_child_org_agent_executions"`
+	DailyChildOrgAgentExecutionsSuccessful int64 `json:"daily_child_org_agent_executions_successful" datastore:"daily_child_org_agent_executions_successful"`
+	DailyChildOrgAgentExecutionsFailed     int64 `json:"daily_child_org_agent_executions_failed" datastore:"daily_child_org_agent_executions_failed"`
+	DailyChildOrgLLMTokens                 int64 `json:"daily_child_org_llm_tokens" datastore:"daily_child_org_llm_tokens"`
+	DailyChildOrgAgentTokens               int64 `json:"daily_child_org_agent_tokens" datastore:"daily_child_org_agent_tokens"`
+	DailyChildOrgAgentInputTokens          int64 `json:"daily_child_org_agent_input_tokens" datastore:"daily_child_org_agent_input_tokens"`
+	DailyChildOrgAgentOutputTokens         int64 `json:"daily_child_org_agent_output_tokens" datastore:"daily_child_org_agent_output_tokens"`
+	DailyChildOrgAgentCachedTokens         int64 `json:"daily_child_org_agent_cached_tokens" datastore:"daily_child_org_agent_cached_tokens"`
+	DailyChildOrgAgentMaxLoopsHit          int64 `json:"daily_child_org_agent_max_loops_hit,omitempty" datastore:"daily_child_org_agent_max_loops_hit"`
+	DailySMSUsage                          int64 `json:"daily_sms_usage" datastore:"daily_sms_usage"`
+	DailyChildOrgSMSUsage                  int64 `json:"daily_child_org_sms_usage" datastore:"daily_child_org_sms_usage"`
+	DailyEmailUsage                        int64 `json:"daily_email_usage" datastore:"daily_email_usage"`
+	DailyChildOrgEmailUsage                int64 `json:"daily_child_org_email_usage" datastore:"daily_child_org_email_usage"`
+
+	HourlyAppExecutions              int64 `json:"hourly_app_executions,omitempty" datastore:"hourly_app_executions"`
+	HourlyChildAppExecutions         int64 `json:"hourly_child_app_executions,omitempty" datastore:"hourly_child_app_executions"`
+	HourlyAppExecutionsFailed        int64 `json:"hourly_app_executions_failed,omitempty" datastore:"hourly_app_executions_failed"`
+	HourlySubflowExecutions          int64 `json:"hourly_subflow_executions,omitempty" datastore:"hourly_subflow_executions"`
+	HourlyWorkflowExecutions         int64 `json:"hourly_workflow_executions,omitempty" datastore:"hourly_workflow_executions"`
+	HourlyChildWorkflowExecutions    int64 `json:"hourly_child_workflow_executions,omitempty" datastore:"hourly_child_workflow_executions"`
+	HourlyWorkflowExecutionsFinished int64 `json:"hourly_workflow_executions_finished,omitempty" datastore:"hourly_workflow_executions_finished"`
+	HourlyWorkflowExecutionsFailed   int64 `json:"hourly_workflow_executions_failed,omitempty" datastore:"hourly_workflow_executions_failed"`
+	HourlyOrgSyncActions             int64 `json:"hourly_org_sync_actions,omitempty" datastore:"hourly_org_sync_actions"`
+	HourlyCloudExecutions            int64 `json:"hourly_cloud_executions,omitempty" datastore:"hourly_cloud_executions"`
+	HourlyOnpremExecutions           int64 `json:"hourly_onprem_executions,omitempty" datastore:"hourly_onprem_executions"`
+	HourlyAIUsage                    int64 `json:"hourly_ai_executions,omitempty" datastore:"hourly_ai_executions"`
+
+	AnnualAppExecutions      int64 `json:"annual_app_executions,omitempty" datastore:"annual_app_executions"`
+	AnnualChildAppExecutions int64 `json:"annual_child_app_executions,omitempty" datastore:"annual_child_app_executions"`
+
+	// These are just here in case we get use of them
+	TotalApiUsage int64 `json:"total_api_usage" datastore:"total_api_usage"`
+	DailyApiUsage int64 `json:"daily_api_usage" datastore:"daily_api_usage"`
+
+	// Store only deleted tenants here. So it doesn't grow out of 1MB datastore limit
+	Tenants   []Tenants   `json:"tenants" datastore:"tenants"`
+	Locations []Locations `json:"locations" datastore:"locations"`
+
+	Additions               []AdditionalUseConfig `json:"additions,omitempty" datastore:"additions"`
+	LastMonthlyResetMonth   int                   `json:"last_monthly_reset_month" datastore:"last_monthly_reset_month"`
+	LastUsageAlertThreshold int64                 `json:"last_usage_alert_threshold" datastore:"last_usage_alert_threshold"`
+	UsageAlerts             []AlertThreshold      `json:"usage_alerts" datastore:"usage_alerts"`
+	MonthlyAIUsageAlertSent bool                  `json:"monthly_ai_usage_alert_sent" datastore:"monthly_ai_usage_alert_sent"`
+}
+
+type MultiRegionStatsEntry struct {
+	OrgId           string            `json:"org_id"`
+	DailyStatistics []DailyStatistics `json:"daily_statistics"`
+}
+
+type AdditionalUseConfig struct {
+	Key   string `json:"key" datastore:"key"`
+	Value int64  `json:"value" datastore:"value"`
+
+	DailyValue int64     `json:"daily_value,omitempty" datastore:"daily_value"`
+	Date       time.Time `json:"date,omitempty" datastore:"date"`
+}
+
+type ParsedOpenApi struct {
+	Body    string `datastore:"body,noindex" json:"body"` // Maps to swagger/openapi>=3
+	ID      string `datastore:"id" json:"id,omitempty"`
+	Success bool   `datastore:"success,omitempty" json:"success,omitempty"`
+}
+
+// Limits set for a user so that they can't do a shitload
+type UserLimits struct {
+	DailyApiUsage           int64 `json:"daily_api_usage" datastore:"daily_api_usage"`
+	DailyWorkflowExecutions int64 `json:"daily_workflow_executions" datastore:"daily_workflow_executions"`
+	DailyCloudExecutions    int64 `json:"daily_cloud_executions" datastore:"daily_cloud_executions"`
+	DailyTriggers           int64 `json:"daily_triggers" datastore:"daily_triggers"`
+	DailyMailUsage          int64 `json:"daily_mail_usage" datastore:"daily_mail_usage"`
+	MaxTriggers             int64 `json:"max_triggers" datastore:"max_triggers"`
+	MaxWorkflows            int64 `json:"max_workflows" datastore:"max_workflows"`
+}
+
+// FIXME: DONT FIX ME! If you add JSON object handling, it will break frontend.
+type Environment struct {
+	Name       string `datastore:"name"`
+	Type       string `datastore:"type"`
+	Registered bool   `datastore:"registered"`
+	Default    bool   `datastore:"default" json:"default"`
+	Archived   bool   `datastore:"archived" json:"archived"`
+	Id         string `datastore:"id" json:"id"`
+	OrgId      string `datastore:"org_id" json:"org_id"`
+	Created    int64  `json:"created" datastore:"created"`
+	Edited     int64  `json:"edited" datastore:"edited"`
+	Checkin    int64  `json:"checkin" datastore:"checkin"`
+	RunningIp  string `json:"running_ip" datastore:"running_ip"`
+	Auth       string `json:"auth" datastore:"auth"`
+	Queue      int    `json:"queue" datastore:"queue"`
+
+	// Unique identifier to a single Orborus runtime
+	// This makes leader/follower model work for failovers
+	OrborusUuid string `json:"orborus_uuid" datastore:"orborus_uuid"`
+
+	//Licensed bool       `json:"licensed" datastore:"licensed"`
+	RunType     string          `json:"run_type" datastore:"run_type"`
+	DataLake    LakeConfig      `json:"data_lake" datastore:"data_lake"`
+	SensorGroup bool            `json:"sensor_group" datastore:"sensor_group"`
+	SensorHosts []SensorDetails `json:"sensor_hosts" datastore:"sensor_hosts"`
+
+	SuborgDistribution []string `json:"suborg_distribution" datastore:"suborg_distribution"`
+}
+
+type LakeConfig struct {
+	Enabled   bool           `json:"enabled" datastore:"enabled"`
+	Pipelines []PipelineInfo `json:"pipelines" datastore:"pipelines"`
+}
+
+// Saves some data, not sure what to have here lol
+type UserAuth struct {
+	Description string          `json:"description" datastore:"description" yaml:"description"`
+	Name        string          `json:"name" datastore:"name" yaml:"name"`
+	Workflows   []string        `json:"workflows" datastore:"workflows"`
+	Username    string          `json:"username" datastore:"username"`
+	Fields      []UserAuthField `json:"fields" datastore:"fields"`
+}
+
+type UserAuthField struct {
+	Key   string `json:"key" datastore:"key"`
+	Value string `json:"value" datastore:"value,noindex"`
+}
+
+// Used to contain users in miniOrg
+type UserMini struct {
+	Username string `datastore:"Username" json:"username"`
+	Id       string `datastore:"id" json:"id"`
+	Role     string `datastore:"role" json:"role"`
+}
+
+type MFAInfo struct {
+	Active       bool   `datastore:"active" json:"active"`
+	ActiveCode   string `datastore:"active_code" json:"active_code"`
+	PreviousCode string `datastore:"previous_code" json:"previous_code"`
+}
+
+type PublicProfile struct {
+	Public              bool                `datastore:"public" json:"public"`
+	Self                bool                `datastore:"self" json:"self"`
+	GithubUsername      string              `datastore:"github_username" json:"github_username"`
+	GithubUserid        string              `datastore:"github_userid" json:"github_userid"`
+	GithubAvatar        string              `datastore:"github_avatar,noindex" json:"github_avatar"`
+	GithubLocation      string              `datastore:"github_location" json:"github_location"`
+	GithubUrl           string              `datastore:"github_url" json:"github_url"`
+	GithubBio           string              `datastore:"github_bio" json:"github_bio"`
+	GithubTwitter       string              `datastore:"github_twitter" json:"github_twitter"`
+	WorkStatus          string              `datastore:"work_status" json:"work_status"`
+	Banner              string              `datastore:"banner" json:"banner"`
+	GithubContributions GithubContributions `datastore:"github_contributions" json:"github_contributions"`
+	ShuffleEarnings     string              `datastore:"shuffle_earnings" json:"shuffle_earnings"`
+	ShuffleRanking      string              `datastore:"shuffle_ranking" json:"shuffle_ranking"`
+
+	Skills          []string        `json:"skills"`
+	Synonyms        []string        `json:"synonyms"`
+	Workflows       int64           `json:"workflows"`
+	Apps            int64           `json:"apps"`
+	SpecializedApps []MinimizedApps `json:"specialized_apps"`
+	Verified        bool            `json:"verified"`
+	Social          []string        `json:"social"`
+}
+
+type ContributionCount struct {
+	Count int64 `datastore:"contribution_count" json:"contribution_count"`
+}
+
+type GithubContributions struct {
+	Core      ContributionCount `datastore:"core" json:"core"`
+	Workflows ContributionCount `datastore:"workflows" json:"workflows"`
+	Apps      ContributionCount `datastore:"apps" json:"apps"`
+	Docs      ContributionCount `datastore:"docs" json:"docs"`
+}
+
+type LoginInfo struct {
+	IP        string `json:"ip" datastore:"ip"`
+	Timestamp int64  `json:"timestamp" datastore:"timestamp"`
+}
+
+type PersonalInfo struct {
+	Firstname string   `datastore:"firstname" json:"firstname"`
+	Lastname  string   `datastore:"lastname" json:"lastname"`
+	Role      string   `datastore:"role" json:"role"`
+	Tutorials []string `datastore:"tutorials" json:"tutorials"`
+}
+
+type UserGeoInfo struct {
+	City struct {
+		Name string `datastore:"name" json:"name"`
+	} `datastore:"city" json:"city"`
+	State struct {
+		Name string `datastore:"name" json:"name"`
+	} `datastore:"state" json:"state"`
+	Country struct {
+		Name    string `datastore:"name" json:"name"`
+		ISOCode string `datastore:"iso_code" json:"iso_code"`
+	} `datastore:"country" json:"country"`
+}
+
+type DeviceNotificationPreferences struct {
+	CriticalPager bool `json:"critical_pager"` // Critical downtime siren alerts
+	AgentRequests bool `json:"agent_requests"` // AI agent human-in-the-loop approvals
+	GeneralAlerts bool `json:"general_alerts"` // General FYI updates & reports
+}
+
+type Device struct {
+	ID          string                        `json:"id"`                    // Unique device identifier
+	Token       string                        `json:"token"`                 // FCM registration token
+	Platform    string                        `json:"platform"`              // "ios", "android", "web", "desktop"
+	DeviceName  string                        `json:"device_name,omitempty"` // e.g., "iPhone 16 Pro", "Chrome macOS"
+	AppVersion  string                        `json:"app_version,omitempty"` // App version
+	Preferences DeviceNotificationPreferences `json:"preferences"`           // Granular notification settings
+
+	CreatedAt  int64 `json:"created_at"`   // Registration timestamp
+	EditedAt   int64 `json:"edited_at"`    // Last updated timestamp
+	LastSeenAt int64 `json:"last_seen_at"` // Last active timestamp
+}
+
+type User struct {
+	Username             string        `datastore:"Username" json:"username"`
+	Password             string        `datastore:"password,noindex" password:"password,omitempty"`
+	Session              string        `datastore:"session" json:"session,omitempty"`
+	Verified             bool          `datastore:"verified,noindex" json:"verified"`
+	SupportAccess        bool          `datastore:"support_access" json:"support_access"`
+	PrivateApps          []WorkflowApp `datastore:"privateapps" json:"privateapps":`
+	Role                 string        `datastore:"role" json:"role"`
+	Roles                []string      `datastore:"roles" json:"roles"`
+	VerificationToken    string        `datastore:"verification_token" json:"verification_token"`
+	ApiKey               string        `datastore:"apikey" json:"apikey"`
+	ResetReference       string        `datastore:"reset_reference" json:"reset_reference"`
+	Executions           ExecutionInfo `datastore:"executions" json:"executions"`
+	Limits               UserLimits    `datastore:"limits" json:"limits,omitempty"`
+	MFA                  MFAInfo       `datastore:"mfa_info,noindex" json:"mfa_info"`
+	Authentication       []UserAuth    `datastore:"authentication,noindex" json:"authentication"`
+	ResetTimeout         int64         `datastore:"reset_timeout,noindex" json:"reset_timeout"`
+	Id                   string        `datastore:"id" json:"id"`
+	Orgs                 []string      `datastore:"orgs" json:"orgs"`
+	CreationTime         int64         `datastore:"creation_time" json:"creation_time"`
+	ActiveOrg            OrgMini       `json:"active_org" datastore:"active_org"`
+	Active               bool          `datastore:"active" json:"active"`
+	FirstSetup           bool          `datastore:"first_setup" json:"first_setup"`
+	LoginType            string        `datastore:"login_type" json:"login_type"`
+	GeneratedUsername    string        `datastore:"generated_username" json:"generated_username"`
+	SessionLogin         bool          `datastore:"session_login" json:"session_login"`                   // Whether it's a login with session or API (used to verify access)
+	ValidatedSessionOrgs []string      `datastore:"validated_session_orgs" json:"validated_session_orgs"` // Orgs that have been used in the current session for the user
+	UsersLastSession     string        `datastore:"users_last_session" json:"users_last_session"`
+	Theme                string        `datastore:"theme" json:"theme"`
+	PublicProfile        PublicProfile `datastore:"public_profile" json:"public_profile"`
+
+	// Tracking logins and such
+	LoginInfo    []LoginInfo  `datastore:"login_info" json:"login_info"`
+	PersonalInfo PersonalInfo `datastore:"personal_info" json:"personal_info"`
+	Regions      []string     `datastore:"regions" json:"regions"`
+	Devices      []Device     `datastore:"devices" json:"devices"` // Handles phones and such for notifications
+
+	UserGeoInfo UserGeoInfo `datastore:"user_geo_info" json:"user_geo_info"`
+
+	// Old web3 integration
+	EthInfo  EthInfo   `datastore:"eth_info" json:"eth_info"`
+	SSOInfos []SSOInfo `datastore:"sso_infos" json:"sso_infos"`
+
+	ProvisionedByOrg string `datastore:"provisioned_by_org" json:"provisioned_by_org"`
+	AllowedApps      []string `json:"allowed_apps,omitempty" datastore:"allowed_apps,omitempty"`
+	OAuthScope       string   `json:"oauth_scope,omitempty" datastore:"oauth_scope,omitempty"`
+}
+
+type SSOInfo struct {
+	// active info for 1 org at a time.
+	Sub             string    `json:"sub"`
+	OrgID           string    `json:"org_id"`
+	ClientID        string    `json:"client_id"`
+	CodeVerifier    string    `json:"code_verifier"` // PKCE code verifier
+	ChallengeExpiry time.Time `json:"challenge_expiry"`
+}
+
+type EthInfo struct {
+	Account string `datastore:"account" json:"account"`
+	Balance string `datastore:"balance" json:"balance"`
+}
+
+type Session struct {
+	Username string `datastore:"Username,noindex"`
+	Id       string `datastore:"Id,noindex"`
+	UserId   string `datastore:"user_id,noindex"`
+	Session  string `datastore:"session,noindex"`
+}
+
+type Contact struct {
+	Firstname               string   `json:"firstname"`
+	Lastname                string   `json:"lastname"`
+	Title                   string   `json:"title"`
+	Companyname             string   `json:"companyname"`
+	Phone                   string   `json:"phone"`
+	Email                   string   `json:"email"`
+	ValidateEmail           string   `json:"validate_email"`
+	Message                 string   `json:"message"`
+	DealType                string   `json:"dealtype"`
+	DealCountry             string   `json:"dealcountry"`
+	Category                string   `json:"Category"`
+	Interests               []string `json:"interests"`
+	LegalAgreementsAccepted bool     `json:"legal_agreements_accepted"`
+	PocTermsAccepted        bool     `json:"poc_terms_accepted"`
+}
+
+type Translator struct {
+	Src struct {
+		Name        string `json:"name" datastore:"name"`
+		Value       string `json:"value" datastore:"value,noindex"`
+		Description string `json:"description" datastore:"description"`
+		Required    string `json:"required" datastore:"required"`
+		Type        string `json:"type" datastore:"type"`
+		Schema      struct {
+			Type string `json:"type" datastore:"type"`
+		} `json:"schema" datastore:"schema"`
+	} `json:"src" datastore:"src"`
+	Dst struct {
+		Name        string `json:"name" datastore:"name"`
+		Value       string `json:"value" datastore:"value,noindex"`
+		Type        string `json:"type" datastore:"type"`
+		Description string `json:"description" datastore:"description"`
+		Required    string `json:"required" datastore:"required"`
+		Schema      struct {
+			Type string `json:"type" datastore:"type"`
+		} `json:"schema" datastore:"schema"`
+	} `json:"dst" datastore:"dst"`
+}
+
+type Appconfig struct {
+	Key   string `json:"key" datastore:"key"`
+	Value string `json:"value" datastore:"value,noindex"`
+}
+
+type ScheduleApp struct {
+	Foldername  string      `json:"foldername" datastore:"foldername,noindex"`
+	Name        string      `json:"name" datastore:"name,noindex"`
+	Id          string      `json:"id" datastore:"id,noindex"`
+	Description string      `json:"description" datastore:"description,noindex"`
+	Action      string      `json:"action" datastore:"action,noindex"`
+	Config      []Appconfig `json:"config,omitempty" datastore:"config,noindex"`
+}
+
+type AppInfo struct {
+	SourceApp      ScheduleApp `json:"sourceapp,omitempty" datastore:"sourceapp,noindex"`
+	DestinationApp ScheduleApp `json:"destinationapp,omitempty" datastore:"destinationapp,noindex"`
+}
+
+type ScheduleOld struct {
+	Name                 string       `json:"name" datastore:"name"`
+	Id                   string       `json:"id" datastore:"id"`
+	StartNode            string       `json:"start_node" datastore:"start_node"`
+	Seconds              int          `json:"seconds" datastore:"seconds"`
+	WorkflowId           string       `json:"workflow_id" datastore:"workflow_id", `
+	Argument             string       `json:"argument" datastore:"argument"`
+	WrappedArgument      string       `json:"wrapped_argument" datastore:"wrapped_argument"`
+	AppInfo              AppInfo      `json:"appinfo" datastore:"appinfo,noindex"`
+	Finished             bool         `json:"finished" finished:"id"`
+	BaseAppLocation      string       `json:"base_app_location" datastore:"baseapplocation,noindex"`
+	Translator           []Translator `json:"translator,omitempty" datastore:"translator"`
+	Org                  string       `json:"org" datastore:"org"`
+	CreatedBy            string       `json:"createdby" datastore:"createdby"`
+	Availability         string       `json:"availability" datastore:"availability"`
+	CreationTime         int64        `json:"creationtime" datastore:"creationtime,noindex"`
+	LastModificationtime int64        `json:"lastmodificationtime" datastore:"lastmodificationtime,noindex"`
+	LastRuntime          int64        `json:"lastruntime" datastore:"lastruntime,noindex"`
+	Frequency            string       `json:"frequency" datastore:"frequency,noindex"`
+	Environment          string       `json:"environment" datastore:"environment"`
+	Status               string       `json:"status" datastore:"status"`
+}
+
+// Returned from /GET /schedules
+type Schedules struct {
+	Schedules []ScheduleOld `json:"schedules"`
+	Success   bool          `json:"success"`
+}
+
+type ScheduleApps struct {
+	Apps    []ApiYaml `json:"apps"`
+	Success bool      `json:"success"`
+}
+
+// Hmm
+type ApiYaml struct {
+	Name        string `json:"name" yaml:"name" required:"true datastore:"name"`
+	Foldername  string `json:"foldername" yaml:"foldername" required:"true datastore:"foldername"`
+	Id          string `json:"id" yaml:"id",required:"true, datastore:"id"`
+	Description string `json:"description" datastore:"description" yaml:"description"`
+	AppVersion  string `json:"app_version" yaml:"app_version",datastore:"app_version"`
+	ContactInfo struct {
+		Name string `json:"name" datastore:"name" yaml:"name"`
+		Url  string `json:"url" datastore:"url" yaml:"url"`
+	} `json:"contact_info" datastore:"contact_info" yaml:"contact_info"`
+	Types []string `json:"types" datastore:"types" yaml:"types"`
+	Input []struct {
+		Name            string `json:"name" datastore:"name" yaml:"name"`
+		Description     string `json:"description" datastore:"description" yaml:"description"`
+		InputParameters []struct {
+			Name        string `json:"name" datastore:"name" yaml:"name"`
+			Description string `json:"description" datastore:"description" yaml:"description"`
+			Required    string `json:"required" datastore:"required" yaml:"required"`
+			Schema      struct {
+				Type string `json:"type" datastore:"type" yaml:"type"`
+			} `json:"schema" datastore:"schema" yaml:"schema"`
+		} `json:"inputparameters" datastore:"inputparameters" yaml:"inputparameters"`
+		OutputParameters []struct {
+			Name        string `json:"name" datastore:"name" yaml:"name"`
+			Description string `json:"description" datastore:"description" yaml:"description"`
+			Required    string `json:"required" datastore:"required" yaml:"required"`
+			Schema      struct {
+				Type string `json:"type" datastore:"type" yaml:"type"`
+			} `json:"schema" datastore:"schema" yaml:"schema"`
+		} `json:"outputparameters" datastore:"outputparameters" yaml:"outputparameters"`
+		Config []struct {
+			Name        string `json:"name" datastore:"name" yaml:"name"`
+			Description string `json:"description" datastore:"description" yaml:"description"`
+			Required    string `json:"required" datastore:"required" yaml:"required"`
+			Schema      struct {
+				Type string `json:"type" datastore:"type" yaml:"type"`
+			} `json:"schema" datastore:"schema" yaml:"schema"`
+		} `json:"config" datastore:"config" yaml:"config"`
+	} `json:"input" datastore:"input" yaml:"input"`
+	Output []struct {
+		Name        string `json:"name" datastore:"name" yaml:"name"`
+		Description string `json:"description" datastore:"description" yaml:"description"`
+		Config      []struct {
+			Name        string `json:"name" datastore:"name" yaml:"name"`
+			Description string `json:"description" datastore:"description" yaml:"description"`
+			Required    string `json:"required" datastore:"required" yaml:"required"`
+			Schema      struct {
+				Type string `json:"type" datastore:"type" yaml:"type"`
+			} `json:"schema" datastore:"schema" yaml:"schema"`
+		} `json:"config" datastore:"config" yaml:"config"`
+		InputParameters []struct {
+			Name        string `json:"name" datastore:"name" yaml:"name"`
+			Description string `json:"description" datastore:"description" yaml:"description"`
+			Required    string `json:"required" datastore:"required" yaml:"required"`
+			Schema      struct {
+				Type string `json:"type" datastore:"type" yaml:"type"`
+			} `json:"schema" datastore:"schema" yaml:"schema"`
+		} `json:"inputparameters" datastore:"inputparameters" yaml:"inputparameters"`
+		OutputParameters []struct {
+			Name        string `json:"name" datastore:"name" yaml:"name"`
+			Description string `json:"description" datastore:"description" yaml:"description"`
+			Required    string `json:"required" datastore:"required" yaml:"required"`
+			Schema      struct {
+				Type string `json:"type" datastore:"type" yaml:"type"`
+			} `json:"schema" datastore:"schema" yaml:"schema"`
+		} `json:"outputparameters" datastore:"outputparameters" yaml:"outputparameters"`
+	} `json:"output" datastore:"output" yaml:"output"`
+}
+
+type Hooks struct {
+	Hooks   []Hook `json:"hooks"`
+	Success bool   `json:"-"`
+}
+
+type Info struct {
+	Url         string `json:"url" datastore:"url"`
+	Name        string `json:"name" datastore:"name"`
+	Description string `json:"description" datastore:"description"`
+}
+
+// Actions to be done by webhooks etc
+// Field is the actual field to use from json
+type HookAction struct {
+	Type  string `json:"type" datastore:"type"`
+	Name  string `json:"name" datastore:"name"`
+	Id    string `json:"id" datastore:"id"`
+	Field string `json:"field" datastore:"field"`
+}
+
+type Hook struct {
+	Id             string       `json:"id" datastore:"id"`
+	Start          string       `json:"start" datastore:"start"`
+	Info           Info         `json:"info" datastore:"info"`
+	Actions        []HookAction `json:"actions" datastore:"actions,noindex"`
+	Type           string       `json:"type" datastore:"type"`
+	Owner          string       `json:"owner" datastore:"owner"`
+	Status         string       `json:"status" datastore:"status"`
+	Workflows      []string     `json:"workflows" datastore:"workflows"`
+	Running        bool         `json:"running" datastore:"running"`
+	OrgId          string       `json:"org_id" datastore:"org_id"`
+	Environment    string       `json:"environment" datastore:"environment"`
+	Auth           string       `json:"auth" datastore:"auth"`
+	CustomResponse string       `json:"custom_response" datastore:"custom_response"`
+	Version        string       `json:"version" datastore:"version"`
+	VersionTimeout int          `json:"version_timeout" datastore:"version_timeout"`
+}
+
+type RegionBody struct {
+	DstRegion string `json:"dst_region"`
+	SrcRegion string `json:"src_region"`
+	OrgId     string `json:"org_id"`
+}
+
+type OrgBranding struct {
+	EnableChat        bool   `json:"enable_chat" datastore:"enable_chat"`
+	HomeUrl           string `json:"home_url" datastore:"home_url"`
+	Theme             string `json:"theme" datastore:"theme"`
+	DocumentationLink string `json:"documentation_link" datastore:"documentation_link"`
+	GlobalUser        bool   `json:"global_user" datastore:"global_user"` // Global user is true when the user is admin of both parent org and suborg.
+	SupportEmail      string `json:"support_email" datastore:"support_email"`
+	LogoutUrl         string `json:"logout_url" datastore:"logout_url"`
+	BrandColor        string `json:"brand_color" datastore:"brand_color"`
+	BrandName         string `json:"brand_name" datastore:"brand_name"`
+}
+
+// Used within a user
+type OrgMini struct {
+	Name      string     `json:"name" datastore:"name"`
+	Id        string     `json:"id" datastore:"id"`
+	Users     []UserMini `json:"users" datastore:"users"`
+	Role      string     `json:"role" datastore:"role"`
+	ChildOrgs []OrgMini  `json:"child_orgs" datastore:"child_orgs"`
+	RegionUrl string     `json:"region_url" datastore:"region_url"`
+	IsPartner bool       `json:"is_partner" datastore:"is_partner"`
+
+	// Branding related
+	Image      string      `json:"image" datastore:"image,noindex"`
+	CreatorOrg string      `json:"creator_org" datastore:"creator_org"`
+	Branding   OrgBranding `json:"branding" datastore:"branding"`
+}
+
+type Priority struct {
+	Name        string `json:"name" datastore:"name"`
+	Description string `json:"description" datastore:"description"`
+	Type        string `json:"type" datastore:"type"`
+	Active      bool   `json:"active" datastore:"active"`
+	URL         string `json:"url" datastore:"url"`
+	Severity    int    `json:"severity" datastore:"severity"` // 1 = high, 2 = mid, 3 = low
+
+	Time int64 `json:"time" datastore:"time"`
+}
+
+type LeadInfo struct {
+	Contacted      bool `json:"contacted,omitempty" datastore:"contacted"`
+	Student        bool `json:"student,omitempty" datastore:"student"`
+	Lead           bool `json:"lead,omitempty" datastore:"lead"`
+	POV            bool `json:"pov,omitempty" datastore:"pov"`
+	TestingShuffle bool `json:"testing_shuffle,omitempty" datastore:"testing_shuffle"`
+	DemoDone       bool `json:"demo_done,omitempty" datastore:"demo_done"`
+	Customer       bool `json:"customer,omitempty" datastore:"customer"`
+	OpenSource     bool `json:"opensource,omitempty" datastore:"opensource"`
+	Internal       bool `json:"internal,omitempty" datastore:"internal"`
+	SubOrg         bool `json:"sub_org,omitempty" datastore:"sub_org"`
+
+	OldCustomer bool `json:"old_customer,omitempty" datastore:"old_customer"`
+	OldLead     bool `json:"old_lead,omitempty" datastore:"old_lead"`
+
+	TechPartner         bool `json:"tech_partner,omitempty" datastore:"tech_partner"`
+	IntegrationPartner  bool `json:"integration_partner,omitempty" datastore:"integration_partner"`
+	DistributionPartner bool `json:"distribution_partner,omitempty" datastore:"distribution_partner"`
+	ServicePartner      bool `json:"service_partner,omitempty" datastore:"service_partner"`
+	ChannelPartner      bool `json:"channel_partner,omitempty" datastore:"channel_partner"`
+
+	Creator bool `json:"creator,omitempty" datastore:"creator"`
+
+	ShuffleEnterpriseLicenseOldCustomer bool `json:"shuffle_enterprise_license_old_customer,omitempty" datastore:"shuffle_enterprise_license_old_customer"`
+	ScaleLicenseCloudTrial              bool `json:"scale_license_cloud_trial,omitempty" datastore:"scale_license_cloud_trial"`
+	OpenSourceLicense                   bool `json:"opensource_license,omitempty" datastore:"opensource_license"`
+	ScaleLicenseCloudCustomer           bool `json:"scale_license_cloud_customer,omitempty" datastore:"scale_license_cloud_customer"`
+	ScaleLicenseOnpremCustomer          bool `json:"scale_license_onprem_customer,omitempty" datastore:"scale_license_onprem_customer"`
+	BusinessLicenseCloud                bool `json:"business_license_cloud,omitempty" datastore:"business_license_cloud"`
+	BusinessLicenseOnprem               bool `json:"business_license_onprem,omitempty" datastore:"business_license_onprem"`
+	EnterpriseLicenseCloud              bool `json:"enterprise_license_cloud,omitempty" datastore:"enterprise_license_cloud"`
+	EnterpriseLicenseOnprem             bool `json:"enterprise_license_onprem,omitempty" datastore:"enterprise_license_onprem"`
+}
+
+// Partners Structs
+type PartnerType struct {
+	TechPartner         bool `json:"tech_partner,omitempty" datastore:"tech_partner"`
+	IntegrationPartner  bool `json:"integration_partner,omitempty" datastore:"integration_partner"`
+	DistributionPartner bool `json:"distribution_partner,omitempty" datastore:"distribution_partner"`
+	ServicePartner      bool `json:"service_partner,omitempty" datastore:"service_partner"`
+	ChannelPartner      bool `json:"channel_partner,omitempty" datastore:"channel_partner"`
+}
+
+type Partner struct {
+	Id                string      `json:"id" datastore:"id"`
+	Name              string      `json:"name" datastore:"name"`
+	Description       string      `json:"description" datastore:"description,noindex"`
+	OrgId             string      `json:"org_id" datastore:"org_id"`
+	ImageUrl          string      `json:"image_url" datastore:"image_url,noindex"`
+	LandscapeImageUrl string      `json:"landscape_image_url" datastore:"landscape_image_url,noindex"`
+	ArticleUrl        string      `json:"article_url" datastore:"article_url,noindex"`
+	WebsiteUrl        string      `json:"website_url" datastore:"website_url"`
+	ContactEmail      string      `json:"contact_email" datastore:"contact_email"`
+	Expertise         []string    `json:"expertise" datastore:"expertise"`
+	Services          []string    `json:"services" datastore:"services"`
+	Solutions         []string    `json:"solutions" datastore:"solutions"`
+	PartnerType       PartnerType `json:"partner_type" datastore:"partner_type"`
+	Country           string      `json:"country" datastore:"country"`
+	Region            string      `json:"region" datastore:"region"`
+	Public            bool        `json:"public" datastore:"public"`
+	Created           int64       `json:"created" datastore:"created"`
+	Edited            int64       `json:"edited" datastore:"edited"`
+}
+
+type UsecaseInfo struct {
+	Id          string `json:"id" datastore:"id"`
+	CompanyInfo struct {
+		Name string `datastore:"name" json:"name"`
+		Id   string `datastore:"id" json:"id"`
+	} `datastore:"companyInfo" json:"companyInfo"`
+	MainContent struct {
+		Title              string   `datastore:"title" json:"title"`
+		Description        string   `datastore:"description,noindex" json:"description"`
+		Categories         []string `datastore:"categories" json:"categories"`
+		PublicWorkflowID   string   `datastore:"PublicWorkflowId" json:"publicWorkflowId"`
+		SourceAppType      string   `datastore:"sourceAppType" json:"sourceAppType"`
+		DestinationAppType string   `datastore:"destinationAppType" json:"destinationAppType"`
+	} `datastore:"mainContent" json:"mainContent"`
+	Navigation struct {
+		Items []struct {
+			Name    string   `datastore:"name" json:"name"`
+			Content []string `datastore:"content,noindex" json:"content"`
+		} `datastore:"items,noindex" json:"items"`
+	} `datastore:"navigation,noindex" json:"navigation"`
+	Public  bool  `datastore:"public" json:"public"`
+	Edited  int64 `datastore:"edited" json:"edited"`
+	Created int64 `datastore:"created" json:"created"`
+}
+
+type OnpremLimits struct {
+	Limit  int64 `json:"limit" datastore:"limit"`
+	Active bool  `json:"active" datastore:"active"`
+}
+
+type OnpremLicense struct {
+	Valid              bool         `json:"valid" datastore:"valid"`
+	Tenant             OnpremLimits `json:"tenant" datastore:"tenant"`
+	Environment        OnpremLimits `json:"environment" datastore:"environment"`
+	WorkflowExecutions OnpremLimits `json:"workflow_executions" datastore:"workflow_executions"`
+	AppRuns            OnpremLimits `json:"app_runs" datastore:"app_runs"`
+	Timeout            string       `json:"timeout" datastore:"timeout"`
+	Branding           bool         `json:"branding" datastore:"branding"`
+	AppRunsGrouping    bool         `json:"app_runs_grouping" datastore:"app_runs_grouping"`
+	StartDate          string       `json:"start_date" datastore:"start_date"`
+}
+
+type Org struct {
+	Name            string       `json:"name" datastore:"name"`
+	Description     string       `json:"description" datastore:"description"`
+	CompanyType     string       `json:"company_type" datastore:"company_type"`
+	Image           string       `json:"image" datastore:"image,noindex"`
+	Id              string       `json:"id" datastore:"id"`
+	Org             string       `json:"org" datastore:"org"`
+	Users           []User       `json:"users" datastore:"users"`
+	Role            string       `json:"role" datastore:"role"`
+	Roles           []string     `json:"roles" datastore:"roles"`
+	ActiveApps      []string     `json:"active_apps" datastore:"active_apps"`
+	CloudSync       bool         `json:"cloud_sync" datastore:"CloudSync"`
+	CloudSyncActive bool         `json:"cloud_sync_active" datastore:"CloudSyncActive"`
+	SyncConfig      SyncConfig   `json:"sync_config" datastore:"sync_config"`
+	SyncFeatures    SyncFeatures `json:"sync_features,omitempty" datastore:"sync_features"`
+	MFARequired     bool         `json:"mfa_required" datastore:"mfa_required"`
+
+	SubscriptionUserId string                `json:"subscription_user_id" datastore:"subscription_user_id"`
+	Subscriptions      []PaymentSubscription `json:"subscriptions" datastore:"subscriptions"`
+
+	SyncUsage         SyncUsage   `json:"sync_usage" datastore:"sync_usage"`
+	Created           int64       `json:"created" datastore:"created"`
+	Edited            int64       `json:"edited" datastore:"edited"`
+	Defaults          Defaults    `json:"defaults" datastore:"defaults"`
+	Invites           []string    `json:"invites" datastore:"invites"`
+	ChildOrgs         []OrgMini   `json:"child_orgs" datastore:"child_orgs"`
+	ManagerOrgs       []OrgMini   `json:"manager_orgs" datastore:"manager_orgs"` // Multi in case more than one org should be able to control another
+	PartnerInfo       PartnerInfo `json:"partner_info" datastore:"partner_info"`
+	SSOConfig         SSOConfig   `json:"sso_config" datastore:"sso_config"`
+	SecurityFramework Categories  `json:"security_framework" datastore:"security_framework,noindex"`
+
+	Interests    []Priority `json:"interests" datastore:"interests"`
+	Priorities   []Priority `json:"priorities" datastore:"priorities,noindex"`
+	MainPriority string     `json:"main_priority" datastore:"main_priority"`
+
+	Region    string     `json:"region" datastore:"region"`
+	RegionUrl string     `json:"region_url" datastore:"region_url"`
+	Tutorials []Tutorial `json:"tutorials" datastore:"tutorials"`
+	LeadInfo  LeadInfo   `json:"lead_info,omitempty" datastore:"lead_info"`
+	OrgAuth   OrgAuth    `json:"org_auth" datastore:"org_auth"`
+
+	CreatorId string `json:"creator_id" datastore:"creator_id"`
+	Disabled  bool   `json:"disabled" datastore:"disabled"`
+
+	EulaSigned   bool        `json:"eula_signed" datastore:"eula_signed"`
+	EulaSignedBy string      `json:"eula_signed_by" datastore:"eula_signed_by"`
+	Billing      Billing     `json:"Billing" datastore:"Billing"`
+	CreatorOrg   string      `json:"creator_org" datastore:"creator_org"`
+	Branding     OrgBranding `json:"branding" datastore:"branding"`
+	Licensed     bool        `json:"licensed" datastore:"licensed"` //Track onprem license
+	OldOrg       bool        `json:"old_org" datastore:"old_org"`   // This is true for org older then 30 days
+}
+
+type Billing struct {
+	Email                      string           `json:"Email" datastore:"Email"`
+	AppRunsHardLimit           int64            `json:"app_runs_hard_limit" datastore:"app_runs_hard_limit"`
+	AlertThreshold             []AlertThreshold `json:"AlertThreshold" datastore:"AlertThreshold"`
+	OnpremAlertThreshold       []AlertThreshold `json:"OnpremAlertThreshold" datastore:"OnpremAlertThreshold"`
+	Consultation               Consultation     `json:"Consultation" datastore:"Consultation"`
+	InternalAppRunsHardLimit   int64            `json:"internal_app_runs_hard_limit" datastore:"internal_app_runs_hard_limit"`
+	DefaultAlertsApplied       bool             `json:"default_alerts_applied" datastore:"default_alerts_applied"`
+	DefaultOnpremAlertsApplied bool             `json:"default_onprem_alerts_applied" datastore:"default_onprem_alerts_applied"`
+}
+
+type AlertThreshold struct {
+	Percentage int  `json:"percentage" datastore:"percentage"`
+	Count      int  `json:"count" datastore:"count"`
+	Email_send bool `json:"Email_send" datastore:"Email_send"`
+}
+
+type Consultation struct {
+	Hours   string `json:"hours" datastore:"hours"`
+	Minutes string `json:"minutes" datastore:"minutes"`
+}
+
+// Authentication overrides that times out
+// Only works for certain features, such as public auth keys
+// Timeout after 24 hours
+type OrgAuth struct {
+	Token   string    `json:"token" datastore:"token"`
+	Expires time.Time `json:"expires" datastore:"expires"`
+}
+
+type PartnerInfo struct {
+	Reseller      bool   `json:"reseller" datastore:"reseller"`
+	ResellerLevel string `json:"reseller_level" datastore:"reseller_level"`
+}
+
+type Defaults struct {
+	AppDownloadRepo        string `json:"app_download_repo" datastore:"app_download_repo"`
+	AppDownloadBranch      string `json:"app_download_branch" datastore:"app_download_branch"`
+	WorkflowDownloadRepo   string `json:"workflow_download_repo" datastore:"workflow_download_repo"`
+	WorkflowDownloadBranch string `json:"workflow_download_branch" datastore:"workflow_download_branch"`
+	NotificationWorkflow   string `json:"notification_workflow" datastore:"notification_workflow"`
+	DocumentationReference string `json:"documentation_reference" datastore:"documentation_reference"`
+
+	WorkflowUploadRepo     string `json:"workflow_upload_repo" datastore:"workflow_upload_repo"`
+	WorkflowUploadBranch   string `json:"workflow_upload_branch" datastore:"workflow_upload_branch"`
+	WorkflowUploadUsername string `json:"workflow_upload_username" datastore:"workflow_upload_username"`
+	WorkflowUploadToken    string `json:"workflow_upload_token" datastore:"workflow_upload_token"`
+
+	TokensEncrypted bool `json:"tokens_encrypted" datastore:"tokens_encrypted"`
+
+	NewsletterDisabled            bool `json:"newsletter" datastore:"newsletter_disabled"`
+	WeeklyRecommendationsDisabled bool `json:"weekly_recommendations" datastore:"weekly_recommendations_disabled"`
+
+	KmsId string `json:"kms_id" datastore:"kms_id"`
+}
+
+type DatastoreAutomationOption struct {
+	Key   string `json:"key" datastore:"key"`
+	Value string `json:"value" datastore:"value,noindex"`
+
+	Apps        []string `json:"apps" datastore:"apps"`
+	Description string   `json:"description" datastore:"description"`
+	Disabled    bool     `json:"disabled" datastore:"disabled"`
+	Template    string   `json:"template,omitempty" datastore:"template"`
+	Skill       string   `json:"skill,omitempty" datastore:"skill"`
+}
+
+type DatastoreAutomation struct {
+	Name        string                      `json:"name" datastore:"name"`
+	Description string                      `json:"description" datastore:"description"`
+	Options     []DatastoreAutomationOption `json:"options" datastore:"options"`
+	Type        string                      `json:"type" datastore:"type"`
+	Icon        string                      `json:"icon" datastore:"icon"`
+	Beta        bool                        `json:"beta" datastore:"beta"`
+	Disabled    bool                        `json:"disabled" datastore:"disabled"`
+	Enabled     bool                        `json:"enabled" datastore:"enabled"`
+}
+
+type PermissionRule struct {
+	Roles  []string `json:"roles,omitempty" datastore:"roles,noindex"`
+	Users  []string `json:"users,omitempty" datastore:"users,noindex"`
+	Groups []string `json:"groups,omitempty" datastore:"groups,noindex"`
+	Scopes []string `json:"scopes,omitempty" datastore:"scopes,noindex"`
+}
+
+type RBAC struct {
+	Inherit bool           `json:"inherit,omitempty" datastore:"inherit,noindex"`
+	Public  bool           `json:"public,omitempty" datastore:"public,noindex"`
+	Read    PermissionRule `json:"read,omitempty" datastore:"read,noindex"`
+	Write   PermissionRule `json:"write,omitempty" datastore:"write,noindex"`
+	Execute PermissionRule `json:"execute,omitempty" datastore:"execute,noindex"`
+	Admin   PermissionRule `json:"admin,omitempty" datastore:"admin,noindex"`
+}
+
+type DatastoreCategorySettings struct {
+	Timeout int64 `json:"timeout" datastore:"timeout"`
+	Public  bool  `json:"public" datastore:"public"` // If the category is public, meaning that it can be accessed without authentication
+	RBAC    *RBAC `json:"rbac,omitempty" datastore:"rbac,noindex"`
+}
+
+type DatastoreCategoryUpdate struct {
+	Id          string                `json:"id" datastore:"id"`
+	OrgId       string                `json:"org_id" datastore:"org_id"`
+	Category    string                `json:"category" datastore:"category"`
+	Automations []DatastoreAutomation `json:"automations" datastore:"automations"`
+
+	Settings DatastoreCategorySettings `json:"settings" datastore:"settings"`
+}
+
+type DatastoreKeyMini struct {
+	Key string `json:"key" datastore:"key"`
+
+	Existed bool `json:"existed" datastore:"existed"` // If the key existed before the update
+	Changed bool `json:"changed" datastore:"changed"` // If the key was updated or not
+}
+
+// Based on OCSF reputation: https://schema.ocsf.io/1.8.0/objects/reputation
+type Reputation struct {
+	BaseScore float64 `json:"base_score" datastore:"base_score"`
+	Provider  string  `json:"provider" datastore:"provider"`
+	Score     string  `json:"score" datastore:"score"`
+}
+
+// Based on OCSF Observable: https://schema.ocsf.io/1.8.0/objects/observable
+type Observable struct {
+	Type      string `json:"type" datastore:"type"`
+	Value     string `json:"value" datastore:"value"`
+	FirstSeen int64  `json:"first_seen" datastore:"first_seen"`
+	LastSeen  int64  `json:"last_seen" datastore:"last_seen"`
+
+	Name       string     `json:"name" datastore:"name"`
+	Reputation Reputation `json:"reputation" datastore:"reputation"`
+}
+
+// Not sure how this is mini anymore (:
+type CacheKeyDataMini struct {
+	Category            string       `json:"category" datastore:"category"`
+	Key                 string       `json:"key" datastore:"Key"`
+	Value               string       `json:"value" datastore:"Value,noindex"`
+	IgnoreSecurityRules bool         `json:"ignore_security_rules" datastore:"ignore_security_rules,noindex"`
+	Enrichments         []Observable `json:"enrichments,omitempty" datastore:"enrichments,noindex"`
+
+	OrgId              string   `json:"org_id,omitempty" datastore:"OrgId"`
+	ExecutionId        string   `json:"execution_id,omitempty" datastore:"ExecutionId"`
+	Authorization      string   `json:"authorization,omitempty" datastore:"Authorization"`
+	SuborgDistribution []string `json:"suborg_distribution" datastore:"suborg_distribution"`
+	Tags               []string `json:"tags,omitempty" datastore:"tags"`
+}
+
+type CacheKeyDataFallback struct {
+	OrgId    string   `json:"org_id,omitempty" datastore:"OrgId"`
+	Key      string   `json:"key" datastore:"Key"`
+	Value    any      `json:"value" datastore:"Value,noindex"`
+	Category string   `json:"category" datastore:"category"`
+	Tags     []string `json:"tags,omitempty" datastore:"tags"`
+
+	Enrichments []Observable `json:"enrichments,omitempty" datastore:"enrichments,noindex"`
+	RBAC        *RBAC        `json:"rbac,omitempty" datastore:"rbac,noindex"`
+}
+
+type CacheKeyData struct {
+	Success             bool         `json:"success,omitempty" datastore:"Success"`
+	WorkflowId          string       `json:"workflow_id,omitempty" datastore:"WorkflowId"`
+	ExecutionId         string       `json:"execution_id,omitempty" datastore:"ExecutionId"`
+	Authorization       string       `json:"authorization,omitempty" datastore:"Authorization"`
+	OrgId               string       `json:"org_id,omitempty" datastore:"OrgId"`
+	Key                 string       `json:"key" datastore:"Key"`
+	Value               string       `json:"value" datastore:"Value,noindex"`
+	Category            string       `json:"category" datastore:"category"`
+	Tags                []string     `json:"tags,omitempty" datastore:"tags"`
+	IgnoreSecurityRules bool         `json:"ignore_security_rules,omitempty" datastore:"ignore_security_rules,noindex"` // Whether to follow 'Automation for X" security rules or not. These are category-wide rules.
+	Enrichments         []Observable `json:"enrichments,omitempty" datastore:"enrichments,noindex"`
+
+	Created int64 `json:"created" datastore:"Created"`
+	Edited  int64 `json:"edited" datastore:"Edited"`
+
+	Existed             bool     `json:"existed,omitempty" datastore:"Existed"` // If the key existed before the update. Should always be set back to false.
+	Changed             bool     `json:"changed,omitempty" datastore:"Changed"` // If the value was changed. Should always be set back to false.
+	Encrypted           bool     `json:"encrypted" datastore:"Encrypted"`
+	FormattedKey        string   `json:"formatted_key,omitempty" datastore:"FormattedKey"`
+	PublicAuthorization string   `json:"public_authorization,omitempty" datastore:"PublicAuthorization"` // Used for public authorization
+	SuborgDistribution  []string `json:"suborg_distribution" datastore:"suborg_distribution"`
+	RevisionId          string   `json:"revision_id" datastore:"revision_id"`
+	UpdatedBy           string   `json:"updated_by" datastore:"updated_by"`
+	RBAC                *RBAC    `json:"rbac,omitempty" datastore:"rbac,noindex"`
+}
+
+type SyncConfig struct {
+	URL      string `json:"url" datastore:"url"`
+	Interval int64  `json:"interval" datastore:"interval"`
+	Apikey   string `json:"api_key" datastore:"api_key"`
+	Source   string `json:"source" datastore:"source"`
+
+	WorkflowBackup bool `json:"workflow_backup" datastore:"workflow_backup"`
+	AppBackup      bool `json:"app_backup" datastore:"app_backup"`
+	AiCloudSync    bool `json:"ai_cloud_sync" datastore:"ai_cloud_sync"`
+
+	WorkflowBackupUpdated int64 `json:"workflow_backup_updated" datastore:"workflow_backup_updated"`
+	AppBackupUpdated      int64 `json:"app_backup_updated" datastore:"app_backup_updated"`
+	AiCloudSyncUpdated    int64 `json:"ai_cloud_sync_updated" datastore:"ai_cloud_sync_updated"`
+}
+
+// RemoteWorkflowInfo holds metadata for a workflow found in a remote git repo.
+type RemoteWorkflowInfo struct {
+	ID            string `json:"id"`
+	Name          string `json:"name"`
+	FolderName    string `json:"folder_name"`
+	UpdatedAt     int64  `json:"updated_at"`
+	FilePath      string `json:"file_path"`
+	ExistsInOrg   bool   `json:"exists_in_org"`
+	OrgWorkflowId string `json:"org_workflow_id"`
+}
+
+type PaymentSubscription struct {
+	Id               string   `json:"id" datastore:"id"`
+	Active           bool     `json:"active" datastore:"active"`
+	Startdate        int64    `json:"startdate" datastore:"startdate"`
+	CancellationDate int64    `json:"cancellationdate" datastore:"cancellationdate"`
+	Enddate          int64    `json:"enddate" datastore:"enddate"`
+	Name             string   `json:"name" datastore:"name"`
+	SupportLevel     string   `json:"support_level" datastore:"support_level"`
+	Recurrence       string   `json:"recurrence" datastore:"recurrence"`
+	Reference        string   `json:"reference" datastore:"reference"`
+	Level            string   `json:"level" datastore:"level"`
+	Amount           string   `json:"amount" datastore:"amount"`
+	Currency         string   `json:"currency" datastore:"currency"`
+	Limit            int64    `json:"limit" datastore:"limit"`
+	Features         []string `json:"features" datastore:"features"`
+
+	Eula         string `json:"eula" datastore:"eula,noindex"`
+	EulaSigned   bool   `json:"eula_signed" datastore:"eula_signed"`
+	EulaSignedBy string `json:"eula_signed_by" datastore:"eula_signed_by"`
+}
+
+type SyncUsage struct {
+	WorkflowExecutions  SyncDataUsage `json:"workflow_executions" datastore:"workflow_executions"`
+	Webhook             SyncDataUsage `json:"webhook" datastore:"webhook"`
+	Schedules           SyncDataUsage `json:"schedules" datastore:"schedules"`
+	UserInput           SyncDataUsage `json:"user_input" datastore:"user_input"`
+	SendMail            SyncDataUsage `json:"send_mail" datastore:"send_mail"`
+	SendSms             SyncDataUsage `json:"send_sms" datastore:"send_sms"`
+	EmailTrigger        SyncDataUsage `json:"email_trigger" datastore:"email_trigger"`
+	Autocomplete        SyncDataUsage `json:"autocomplete" datastore:"autocomplete"`
+	Authentication      SyncDataUsage `json:"authentication" datastore:"authentication"`
+	Schedule            SyncDataUsage `json:"schedule" datastore:"schedule"`
+	AppExecutions       SyncDataUsage `json:"app_executions" datastore:"app_executions"`
+	OnpremAppExecutions SyncDataUsage `json:"onprem_app_executions" datastore:"onprem_app_executions"`
+	Workflows           SyncDataUsage `json:"workflows" datastore:"workflows"`
+	MultiTenant         SyncDataUsage `json:"multi_tenant" datastore:"multi_tenant"`
+	MultiRegion         SyncDataUsage `json:"multi_region" datastore:"multi_region"`
+	MultiEnv            SyncDataUsage `json:"multi_env" datastore:"multi_env"`
+	Apps                SyncDataUsage `json:"apps" datastore:"apps"`
+	ShuffleGPT          SyncDataUsage `json:"shuffle_gpt" datastore:"shuffle_gpt"`
+	AgentExecutions     SyncDataUsage `json:"agent_executions" datastore:"agent_executions"`
+
+	LLMTokens   SyncDataUsage `json:"llm_tokens" datastore:"llm_tokens"`
+	AgentTokens SyncDataUsage `json:"agent_tokens" datastore:"agent_tokens"`
+}
+
+type SyncDataUsage struct {
+	StartDate int64  `json:"start_date" datastore:"start_date"`
+	EndDate   int64  `json:"end_date" datastore:"end_date"`
+	Reset     string `json:"reset" datastore:"reset"`
+	Counter   int64  `json:"counter" datastore:"counter"`
+}
+
+type NewValue struct {
+	OrgId               string `json:"org_id" datastore:"org_id"`
+	WorkflowId          string `json:"workflow_id" datastore:"workflow_id"`
+	WorkflowExecutionId string `json:"workflow_execution_id" datastore:"workflow_execution_id"`
+	ParameterName       string `json:"parameter_name" datastore:"parameter_name"`
+	Value               string `json:"value" datastore:"value,noindex"`
+	Created             int64  `json:"created" datastore:"created"`
+	Id                  string `json:"id" datastore:"id"`
+}
+
+type MailLevel struct {
+	Type       string `json:"type"`
+	Percentage int64  `json:"percentage"`
+	LastSent   int64  `json:"last_sent"`
+}
+
+type SyncFeatures struct {
+	Editing               bool        `json:"editing" datastore:"editing"`
+	MailSent              []MailLevel `json:"mail_sent" datastore:"mail_sent"`
+	AppExecutions         SyncData    `json:"app_executions" datastore:"app_executions"`
+	OnpremAppExecutions   SyncData    `json:"onprem_app_executions" datastore:"onprem_app_executions"`
+	AnnualAppRunsGrouping SyncData    `json:"annual_app_runs_grouping" datastore:"annual_app_runs_grouping"`
+	MultiEnv              SyncData    `json:"multi_env" datastore:"multi_env"`
+	MultiTenant           SyncData    `json:"multi_tenant" datastore:"multi_tenant"`
+	MultiRegion           SyncData    `json:"multi_region" datastore:"multi_region"`
+	Webhook               SyncData    `json:"webhook" datastore:"webhook"`
+	Schedules             SyncData    `json:"schedules" datastore:"schedules"`
+	UserInput             SyncData    `json:"user_input" datastore:"user_input"`
+	SendMail              SyncData    `json:"send_mail" datastore:"send_mail"`
+	SendSms               SyncData    `json:"send_sms" datastore:"send_sms"`
+	Updates               SyncData    `json:"updates" datastore:"updates"`
+	EmailTrigger          SyncData    `json:"email_trigger" datastore:"email_trigger"`
+	Notifications         SyncData    `json:"notifications" datastore:"notifications"`
+	Workflows             SyncData    `json:"workflows" datastore:"workflows"`
+	Autocomplete          SyncData    `json:"autocomplete" datastore:"autocomplete"`
+	WorkflowExecutions    SyncData    `json:"workflow_executions" datastore:"workflow_executions"`
+	Authentication        SyncData    `json:"authentication" datastore:"authentication"`
+	Schedule              SyncData    `json:"schedule" datastore:"schedule"`
+	Apps                  SyncData    `json:"apps" datastore:"apps"`
+	ShuffleGPT            SyncData    `json:"shuffle_gpt" datastore:"shuffle_gpt"`
+	Branding              SyncData    `json:"branding" datastore:"branding"`
+	AgentExecutions       SyncData    `json:"agent_executions" datastore:"agent_executions"`
+	AgentTokens           SyncData    `json:"agent_tokens" datastore:"agent_tokens"`
+	Multiplayer           SyncData    `json:"multiplayer" datastore:"multiplayer"`
+	LLMTokens             SyncData    `json:"llm_tokens" datastore:"llm_tokens"`
+}
+
+type SyncData struct {
+	Active         bool   `json:"active" datastore:"active"`
+	Type           string `json:"type,omitempty" datastore:"type"`
+	Name           string `json:"name,omitempty" datastore:"name"`
+	Description    string `json:"description,omitempty" datastore:"description"`
+	Usage          int64  `json:"usage" datastore:"usage"`
+	Limit          int64  `json:"limit" datastore:"limit"`
+	StartDate      int64  `json:"start_date,omitempty" datastore:"start_date"`
+	EndDate        int64  `json:"end_date,omitempty" datastore:"end_date"`
+	DataCollection int64  `json:"data_collection,omitempty" datastore:"data_collection"`
+}
+
+type Variable struct {
+	Description string `json:"description" datastore:"description,noindex"`
+	ID          string `json:"id" datastore:"id"`
+	Name        string `json:"name" datastore:"name"`
+	Value       string `json:"value" datastore:"value,noindex"`
+}
+
+type SingulResult struct {
+	Success     bool        `json:"success"`
+	Action      string      `json:"action"`
+	Output      string      `json:"output"`
+	RawResponse interface{} `json:"raw_response"`
+}
+
+type SingulStats struct {
+	Id string `json:"id"`
+
+	Failed               bool   `json:"failed"`
+	Result               string `json:"result"`
+	ExecutionId          string `json:"execution_id"`
+	WorkflowId           string `json:"workflow_id"`
+	NotificationWorkflow bool   `json:"notification_workflow"`
+
+	IsGeneratedNotificationWorkflow bool `json:"is_generated_notification_workflow"`
+
+	OrgId string `json:"org_id"`
+}
+
+type WorkflowExecution struct {
+	Type                string         `json:"type" datastore:"type"`
+	Status              string         `json:"status" datastore:"status"`
+	Start               string         `json:"start" datastore:"start"`
+	ExecutionArgument   string         `json:"execution_argument" datastore:"execution_argument,noindex"`
+	ExecutionId         string         `json:"execution_id" datastore:"execution_id"`
+	ExecutionOrg        string         `json:"execution_org" datastore:"execution_org"`
+	StartedAt           int64          `json:"started_at" datastore:"started_at"`
+	CompletedAt         int64          `json:"completed_at" datastore:"completed_at"`
+	WorkflowId          string         `json:"workflow_id" datastore:"workflow_id"`
+	LastNode            string         `json:"last_node" datastore:"last_node"`
+	Authorization       string         `json:"authorization" datastore:"authorization"`
+	Result              string         `json:"result" datastore:"result,noindex"`
+	ProjectId           string         `json:"project_id" datastore:"project_id"`
+	Locations           []string       `json:"locations,omitempty" datastore:"locations"`
+	Workflow            Workflow       `json:"workflow,omitempty" datastore:"workflow,noindex"`
+	Results             []ActionResult `json:"results" datastore:"results,noindex"`
+	ExecutionVariables  []Variable     `json:"execution_variables,omitempty" datastore:"execution_variables,omitempty"`
+	OrgId               string         `json:"org_id" datastore:"org_id"`
+	ExecutionSource     string         `json:"execution_source" datastore:"execution_source"`
+	ExecutionParent     string         `json:"execution_parent" datastore:"execution_parent"`
+	ExecutionSourceNode string         `json:"execution_source_node" yaml:"execution_source_node"`
+	ExecutionSourceAuth string         `json:"execution_source_auth" yaml:"execution_source_auth"`
+	SubExecutionCount   int64          `json:"sub_execution_count" yaml:"sub_execution_count"` // Max depth to execute subflows in infinite loops (10 by default)
+	Priority            int64          `json:"priority" datastore:"priority" yaml:"priority"`  // Priority of the execution. Usually manual should be 10, and all other UNDER that.
+
+	NotificationsCreated int64   `json:"notifications_created" datastore:"notifications_created"`
+	Authgroup            string  `json:"authgroup" datastore:"authgroup"`
+	Org                  OrgMini `json:"org" datastore:"-"`
+}
+
+type Position struct {
+	X float64 `json:"x" datastore:"x"`
+	Y float64 `json:"y" datastore:"y"`
+}
+
+// This is for the nodes in a workflow, NOT the app action itself.
+type Action struct {
+	AppName           string                       `json:"app_name" datastore:"app_name"`
+	AppVersion        string                       `json:"app_version" datastore:"app_version"`
+	Description       string                       `json:"description" datastore:"description,noindex"`
+	AppID             string                       `json:"app_id" datastore:"app_id"`
+	Errors            []string                     `json:"errors" datastore:"errors"`
+	ID                string                       `json:"id" datastore:"id"`
+	IsValid           bool                         `json:"is_valid" datastore:"is_valid"`
+	IsStartNode       bool                         `json:"isStartNode,omitempty" datastore:"isStartNode"`
+	Sharing           bool                         `json:"sharing,omitempty" datastore:"sharing"`
+	PrivateID         string                       `json:"private_id,omitempty" datastore:"private_id"`
+	Label             string                       `json:"label,omitempty" datastore:"label"`
+	SmallImage        string                       `json:"small_image,omitempty" datastore:"small_image,noindex" required:false yaml:"small_image"`
+	Public            bool                         `json:"public" datastore:"public"`
+	Generated         bool                         `json:"generated" yaml:"generated" required:false datastore:"generated"`
+	LargeImage        string                       `json:"large_image,omitempty" datastore:"large_image,noindex" yaml:"large_image" required:false`
+	Environment       string                       `json:"environment,omitempty" datastore:"environment"`
+	Name              string                       `json:"name" datastore:"name"`
+	Parameters        []WorkflowAppActionParameter `json:"parameters" datastore: "parameters,noindex"`
+	InvalidParameters []WorkflowAppActionParameter `json:"previous_parameters,omitempty" datastore: "previous_parameters,noindex"`
+	ExecutionVariable Variable                     `json:"execution_variable,omitempty" datastore:"execution_variable,omitempty"`
+	Position          Position                     `json:"position,omitempty"`
+	Priority          int                          `json:"priority,omitempty" datastore:"priority"`
+	AuthenticationId  string                       `json:"authentication_id" datastore:"authentication_id"`
+	Example           string                       `json:"example,omitempty" datastore:"example,noindex"`
+	AuthNotRequired   bool                         `json:"auth_not_required,omitempty" datastore:"auth_not_required" yaml:"auth_not_required"`
+	Category          string                       `json:"category" datastore:"category"`
+	ReferenceUrl      string                       `json:"reference_url" datastore:"reference_url"`
+	SubAction         bool                         `json:"sub_action" datastore:"sub_action"`
+	RunMagicOutput    bool                         `json:"run_magic_output" datastore:"run_magic_output" yaml:"run_magic_output"`
+	RunMagicInput     bool                         `json:"run_magic_input" datastore:"run_magic_input" yaml:"run_magic_input"`
+	ExecutionDelay    int64                        `json:"execution_delay" yaml:"execution_delay" datastore:"execution_delay"`
+	CategoryLabel     []string                     `json:"category_label" datastore:"category_label"` // For categorization of the type of node in case it's available
+	Suggestion        bool                         `json:"suggestion" datastore:"suggestion"`         // Whether it was a suggestion in the workflow or not
+
+	ParentControlled bool `json:"parent_controlled" datastore:"parent_controlled"` // If the parent workflow node exists, and shouldn't be editable by child workflow
+
+	// ParameterLocks []ParameterLock `json:"parameter_locks" datastore:"parameter_locks"`
+	SourceWorkflow  string `json:"source_workflow" yaml:"source_workflow" datastore:"source_workflow"`
+	SourceExecution string `json:"source_execution" yaml:"source_execution" datastore:"source_execution"`
+
+	// This is used for YAML translations in case we don't want to use the UI
+	//SourceConditions []Branch `json:"source_conditions" yaml:"source_conditions" datastore:"source_conditions"` // Conditions that are used to determine the source of the action
+	//Target string `json:"target,omitempty" yaml:"target,omitempty" datastore:"target"` // Target of the action, used for branches and conditions
+}
+
+// Added environment for location to execute
+type Trigger struct {
+	AppName         string                       `json:"app_name" datastore:"app_name"`
+	Description     string                       `json:"description" datastore:"description,noindex"`
+	LongDescription string                       `json:"long_description" datastore:"long_description"`
+	Status          string                       `json:"status" datastore:"status"`
+	AppVersion      string                       `json:"app_version" datastore:"app_version"`
+	Errors          []string                     `json:"errors" datastore:"errors"`
+	ID              string                       `json:"id" datastore:"id"`
+	IsValid         bool                         `json:"is_valid" datastore:"is_valid"`
+	IsStartNode     bool                         `json:"isStartNode" datastore:"isStartNode"`
+	Label           string                       `json:"label" datastore:"label"`
+	SmallImage      string                       `json:"small_image" datastore:"small_image,noindex" required:false yaml:"small_image"`
+	LargeImage      string                       `json:"large_image" datastore:"large_image,noindex" yaml:"large_image" required:false`
+	Environment     string                       `json:"environment" datastore:"environment"`
+	TriggerType     string                       `json:"trigger_type" datastore:"trigger_type"`
+	Name            string                       `json:"name" datastore:"name"`
+	Tags            []string                     `json:"tags" datastore:"tags" yaml:"tags"`
+	Parameters      []WorkflowAppActionParameter `json:"parameters" datastore: "parameters,noindex"`
+	Position        struct {
+		X float64 `json:"x" datastore:"x"`
+		Y float64 `json:"y" datastore:"y"`
+	} `json:"position"`
+	Priority         int         `json:"priority" datastore:"priority"`
+	SourceWorkflow   string      `json:"source_workflow" yaml:"source_workflow" datastore:"source_workflow"`
+	ExecutionDelay   int64       `json:"execution_delay" yaml:"execution_delay" datastore:"execution_delay"`
+	AppAssociation   WorkflowApp `json:"app_association" yaml:"app_association" datastore:"app_association"`
+	ParentControlled bool        `json:"parent_controlled" datastore:"parent_controlled"` // If the parent workflow node exists, and shouldn't be editable by child workflow
+
+	// TODO: make this a predictable field
+	// generated from current ID + workflow ID + orgid as seed
+	ReplacementForTrigger string `json:"replacement_for_trigger" datastore:"replacement_for_trigger"` // If this trigger is a replacement for another trigger
+}
+
+type Branch struct {
+	DestinationID string      `json:"destination_id" datastore:"destination_id"`
+	ID            string      `json:"id" datastore:"id"`
+	SourceID      string      `json:"source_id" datastore:"source_id"`
+	Label         string      `json:"label" datastore:"label"`
+	HasError      bool        `json:"has_errors" datastore: "has_errors"`
+	Conditions    []Condition `json:"conditions" datastore: "conditions"`
+	Decorator     bool        `json:"decorator" datastore:"decorator"`
+
+	ParentControlled bool   `json:"parent_controlled" datastore:"parent_controlled"` // If the parent workflow node exists, and shouldn't be editable by child workflow
+	SourceParent     string `json:"source_parent" datastore:"source_parent"`         // Parent node of the actual source we use. Mainly added for handling else/if-s in branches. Automatically happens during workflow saves (frontend for now)
+}
+
+// Same format for a lot of stuff
+type Condition struct {
+	Source      WorkflowAppActionParameter `json:"source" datastore:"source"`
+	Condition   WorkflowAppActionParameter `json:"condition" datastore:"condition"`
+	Destination WorkflowAppActionParameter `json:"destination" datastore:"destination"`
+}
+
+type Schedule struct {
+	Name              string `json:"name" datastore:"name"`
+	Frequency         string `json:"frequency" datastore:"frequency"`
+	ExecutionArgument string `json:"execution_argument" datastore:"execution_argument,noindex"`
+	Id                string `json:"id" datastore:"id"`
+	OrgId             string `json:"org_id" datastore:"org_id"`
+	Environment       string `json:"environment" datastore:"environment"`
+	Start             string `json:"start" datastore:"start"`
+}
+
+type Comment struct {
+	ID              string `json:"id" datastore:"id"`
+	Label           string `json:"label" datastore:"label"`
+	Type            string `json:"type" datastore:"type"`
+	IsValid         bool   `json:"is_valid" datastore:"is_valid"`
+	Decorator       bool   `json:"decorator" datastore:"decorator"`
+	Width           int64  `json:"width" datastore:"width"`
+	Height          int64  `json:"height" datastore:"height"`
+	Color           string `json:"color" datastore:"color"`
+	BackgroundColor string `json:"backgroundcolor" datastore:"backgroundcolor"`
+	BackgroundImage   string `json:"backgroundimage" datastore:"backgroundimage"`
+	TextJustification string `json:"textJustification" datastore:"textJustification"`
+	Position        struct {
+		X float64 `json:"x" datastore:"x"`
+		Y float64 `json:"y" datastore:"y"`
+	} `json:"position"`
+}
+
+type InputQuestion struct {
+	Name     string `json:"name" datastore:"name,noindex"`
+	Value    string `json:"value" datastore:"value,noindex"`
+	Required bool   `json:"required" datastore:"required"`
+	Deleted  bool   `json:"deleted" datastore:"deleted"`
+}
+
+type FormControl struct {
+	InputMarkdown  string   `json:"input_markdown" datastore:"input_markdown,noindex"`
+	OutputYields   []string `json:"output_yields" datastore:"output_yields"`     // Defines the nodes that will YIELD their output to the frontend during execution
+	CleanupActions []string `json:"cleanup_actions" datastore:"cleanup_actions"` // Defines the nodes that will not return any value at the end of a workflow (stored)
+
+	FormWidth int64 `json:"form_width" datastore:"form_width"`
+}
+
+type Workflow struct {
+	WorkflowAsCode bool      `json:"workflow_as_code" datastore:"workflow_as_code"`
+	Actions        []Action  `json:"actions" datastore:"actions,noindex"`
+	Branches       []Branch  `json:"branches" datastore:"branches,noindex"`
+	VisualBranches []Branch  `json:"visual_branches" datastore:"visual_branches,noindex"`
+	Triggers       []Trigger `json:"triggers" datastore:"triggers,noindex"`
+	Comments       []Comment `json:"comments" datastore:"comments,noindex"`
+	Configuration  struct {
+		ExitOnError       bool `json:"exit_on_error" datastore:"exit_on_error"`
+		StartFromTop      bool `json:"start_from_top" datastore:"start_from_top"`
+		SkipNotifications bool `json:"skip_notifications" datastore:"skip_notifications"`
+	} `json:"configuration,omitempty" datastore:"configuration"`
+	Created              int64      `json:"created" datastore:"created"`
+	Edited               int64      `json:"edited" datastore:"edited"`
+	LastRuntime          int64      `json:"last_runtime" datastore:"last_runtime"`
+	DueDate              int64      `json:"due_date" datastore:"due_date"`
+	Errors               []string   `json:"errors,omitempty" datastore:"errors"`
+	Tags                 []string   `json:"tags,omitempty" datastore:"tags"`
+	ID                   string     `json:"id" datastore:"id"`
+	IsValid              bool       `json:"is_valid" datastore:"is_valid"`
+	Name                 string     `json:"name" datastore:"name"`
+	Description          string     `json:"description" datastore:"description,noindex"`
+	Start                string     `json:"start" datastore:"start"`
+	Owner                string     `json:"owner" datastore:"owner"`
+	Sharing              string     `json:"sharing" datastore:"sharing"` // Not really used outside of Forms.
+	Image                string     `json:"image,omitempty" datastore:"image,noindex"`
+	Org                  []OrgMini  `json:"org,omitempty" datastore:"org"`
+	ExecutingOrg         OrgMini    `json:"execution_org,omitempty" datastore:"execution_org"`
+	OrgId                string     `json:"org_id,omitempty" datastore:"org_id"`
+	WorkflowVariables    []Variable `json:"workflow_variables" datastore:"workflow_variables"`
+	ExecutionVariables   []Variable `json:"execution_variables,omitempty" datastore:"execution_variables"`
+	ExecutionEnvironment string     `json:"execution_environment" datastore:"execution_environment"`
+	PreviouslySaved      bool       `json:"previously_saved" datastore:"first_save"`
+	Categories           Categories `json:"categories" datastore:"categories"`
+	ExampleArgument      string     `json:"example_argument" datastore:"example_argument,noindex"`
+	Public               bool       `json:"public" datastore:"public"`
+	DefaultReturnValue   string     `json:"default_return_value" datastore:"default_return_value,noindex"`
+	ContactInfo          struct {
+		Name string `json:"name" datastore:"name" yaml:"name"`
+		Url  string `json:"url" datastore:"url" yaml:"url"`
+	} `json:"contact_info" datastore:"contact_info" yaml:"contact_info" required:false`
+	PublishedId string     `json:"published_id" yaml:"published_id"`
+	RevisionId  string     `json:"revision_id" yaml:"revision_id"`
+	Subflows    []Workflow `json:"subflows,omitempty" yaml:"subflows"`
+	UsecaseIds  []string   `json:"usecase_ids" yaml:"usecase_ids" datastore:"usecase_ids"`
+
+	InputQuestions []InputQuestion `json:"input_questions" datastore:"input_questions"`
+
+	FormControl FormControl `json:"form_control" datastore:"form_control"`
+
+	Blogpost             string `json:"blogpost" yaml:"blogpost"`
+	Video                string `json:"video" yaml:"video"`
+	Status               string `json:"status" datastore:"status"`
+	WorkflowType         string `json:"workflow_type" datastore:"workflow_type"`
+	Generated            bool   `json:"generated" datastore:"generated"`
+	Hidden               bool   `json:"hidden" datastore:"hidden"`
+	BackgroundProcessing bool   `json:"background_processing" datastore:"background_processing"` // If the workflow should be processed in the background
+	UpdatedBy            string `json:"updated_by" datastore:"updated_by"`
+
+	// Whether it's manually validated or not
+	Validated  bool           `json:"validated" datastore:"validated"`
+	Validation TypeValidation `json:"validation" datastore:"validation"`
+
+	// Distribution system for suborg/parentorg
+	ParentWorkflowId   string   `json:"parentorg_workflow" datastore:"parentorg_workflow"`
+	ChildWorkflowIds   []string `json:"childorg_workflow_ids" datastore:"childorg_workflow_ids"`
+	SuborgDistribution []string `json:"suborg_distribution" datastore:"suborg_distribution"`
+
+	// Config for backup configs
+	// This overrides org settings for the workflow
+	BackupConfig BackupConfig `json:"backup_config" datastore:"backup_config"`
+	AuthGroups   []string     `json:"auth_groups" datastore:"auth_groups"`
+	AIConfig     *AIConfig    `json:"ai_config,omitempty" datastore:"ai_config,omitempty"`
+}
+
+type BackupConfig struct {
+	OnpremBackup bool `json:"onprem_backup" datastore:"onprem_backup"`
+
+	UploadRepo     string `json:"upload_repo" datastore:"upload_repo"`
+	UploadBranch   string `json:"upload_branch" datastore:"upload_branch"`
+	UploadUsername string `json:"upload_username" datastore:"upload_username"`
+	UploadToken    string `json:"upload_token" datastore:"upload_token"`
+
+	TokensEncrypted bool `json:"tokens_encrypted" datastore:"tokens_encrypted"`
+}
+
+type Category struct {
+	Name        string `json:"name" datastore:"name"`
+	Count       int64  `json:"count" datastore:"count"`
+	ID          string `json:"id" datastore:"id"`
+	Description string `json:"description" datastore:"description,noindex"`
+	LargeImage  string `json:"large_image" datastore:"large_image,noindex"`
+}
+
+type Categories struct {
+	SIEM          Category `json:"siem" datastore:"siem"`
+	Communication Category `json:"communication" datastore:"communication"`
+	Assets        Category `json:"assets" datastore:"assets"`
+	Cases         Category `json:"cases" datastore:"cases"`
+	Network       Category `json:"network" datastore:"network"`
+	Intel         Category `json:"intel" datastore:"intel"`
+	EDR           Category `json:"edr" datastore:"edr"`
+	IAM           Category `json:"iam" datastore:"IAM"`
+	AI            Category `json:"ai" datastore:"ai"`
+
+	Email Category `json:"email" datastore:"email"`
+	Other Category `json:"other" datastore:"other"`
+}
+
+type SimilarAction struct {
+	WorkflowId  string `json:"workflow_id" datastore:"workflow_id"`
+	ExecutionId string `json:"execution_id" datastore:"execution_id"`
+	Similarity  int64  `json:"similarity" datastore:"similarity"`
+}
+
+type ActionResult struct {
+	Action        Action `json:"action" datastore:"action"`
+	ExecutionId   string `json:"execution_id" datastore:"execution_id"`
+	Authorization string `json:"authorization" datastore:"authorization"`
+	Result        string `json:"result" datastore:"result,noindex"`
+	StartedAt     int64  `json:"started_at" datastore:"started_at"`
+	CompletedAt   int64  `json:"completed_at" datastore:"completed_at"`
+	Status        string `json:"status" datastore:"status"`
+
+	AttackTechniques []string        `json:"attack_techniques" datastore:"attack_techniques"`
+	AttackTactics    []string        `json:"attack_tactics" datastore:"attack_tactics"`
+	SimilarActions   []SimilarAction `json:"similar_actions" datastore:"similar_actions"`
+	Sanitized        bool            `json:"sanitized" datastore:"sanitized"`
+}
+
+type ExecutionChronologyViolation struct {
+	ActionID    string `json:"action_id"`
+	ActionLabel string `json:"action_label"`
+	ParentID    string `json:"parent_id"`
+	ActionStart int64  `json:"action_start"`
+	ParentEnd   int64  `json:"parent_end"`
+	GapMs       int64  `json:"gap_ms"`
+}
+
+type AuthenticationUsage struct {
+	WorkflowId string   `json:"workflow_id" datastore:"workflow_id"`
+	Nodes      []string `json:"nodes" datastore:"nodes"`
+}
+
+type Notification struct {
+	Image             string   `json:"image" datastore:"image"`
+	CreatedAt         int64    `json:"created_at" datastore:"created_at"`
+	UpdatedAt         int64    `json:"updated_at" datastore:"updated_at"`
+	Title             string   `json:"title" datastore:"title,noindex"`
+	Description       string   `json:"description" datastore:"description,noindex"`
+	OrgId             string   `json:"org_id" datastore:"org_id"`
+	OrgName           string   `json:"org_name" datastore:"org_name"`
+	UserId            string   `json:"user_id" datastore:"user_id"`
+	Tags              []string `json:"tags" datastore:"tags"`
+	Amount            int      `json:"amount" datastore:"amount"`
+	BucketDescription string   `json:"bucket_description" datastore:"bucket_description"`
+	Id                string   `json:"id" datastore:"id"`
+	ReferenceUrl      string   `json:"reference_url" datastore:"reference_url,noindex"`
+	OrgNotificationId string   `json:"org_notification_id" datastore:"org_notification_id"`
+	Dismissable       bool     `json:"dismissable" datastore:"dismissable"`
+	Personal          bool     `json:"personal" datastore:"personal"`
+	Read              bool     `json:"read" datastore:"read"`
+
+	ModifiedBy    string `json:"modified_by" datastore:"modified_by"`
+	Ignored       bool   `json:"ignored" datastore:"ignored"`
+	ExecutionId   string `json:"execution_id" datastore:"execution_id"`
+	WorkflowId    string `json:"workflow_id" datastore:"workflow_id"`
+	NodeId        string `json:"node_id" datastore:"node_id"`
+	NodeLabel     string `json:"node_label" datastore:"node_label"`
+	ActionName    string `json:"action_name" datastore:"action_name"`
+	AppName       string `json:"app_name" datastore:"app_name"`
+	NodeStatus    string `json:"node_status" datastore:"node_status"`
+	FailureReason string `json:"failure_reason" datastore:"failure_reason,noindex"`
+
+	Severity string `json:"severity" datastore:"severity"`
+	Origin   string `json:"origin" datastore:"origin"`
+}
+
+type NotificationCached struct {
+	NotificationId            string `json:"notification_id" datastore:"notification_id"`
+	WorkflowId                string `json:"workflow_id" datastore:"workflow_id"`
+	LastUpdated               int64  `json:"last_updated" datastore:"last_updated"`
+	FirstUpdated              int64  `json:"first_updated" datastore:"first_updated"`
+	LastNotificationAttempted string `json:"last_notification_attempted" datastore:"last_notification_attempted"`
+	OriginalNotification      string `json:"original_notification" datastore:"original_notification"`
+	Amount                    int64  `json:"amount" datastore:"amount"`
+}
+
+type NotificationFailureContext struct {
+	ExecutionId   string `json:"execution_id"`
+	WorkflowId    string `json:"workflow_id"`
+	NodeId        string `json:"node_id"`
+	NodeLabel     string `json:"node_label"`
+	ActionName    string `json:"action_name"`
+	AppName       string `json:"app_name"`
+	NodeStatus    string `json:"node_status"`
+	FailureReason string `json:"failure_reason"`
+}
+
+type File struct {
+	Id                 string   `json:"id" datastore:"id"`
+	ReferenceFileId    string   `json:"reference_file_id" datastore:"reference_file_id"`
+	Type               string   `json:"type" datastore:"type"`
+	CreatedAt          int64    `json:"created_at" datastore:"created_at"`
+	UpdatedAt          int64    `json:"updated_at" datastore:"updated_at"`
+	MetaAccessAt       int64    `json:"meta_access_at" datastore:"meta_access_at"`
+	DownloadAt         int64    `json:"last_downloaded" datastore:"last_downloaded"`
+	Description        string   `json:"description" datastore:"description"`
+	ExpiresAt          string   `json:"expires_at" datastore:"expires_at"`
+	Status             string   `json:"status" datastore:"status"`
+	Filename           string   `json:"filename" datastore:"filename"`
+	URL                string   `json:"url" datastore:"org"`
+	OrgId              string   `json:"org_id" datastore:"org_id"`
+	WorkflowId         string   `json:"workflow_id" datastore:"workflow_id"`
+	Workflows          []string `json:"workflows" datastore:"workflows"`
+	DownloadPath       string   `json:"download_path" datastore:"download_path"`
+	Md5sum             string   `json:"md5_sum" datastore:"md5_sum"`
+	Sha256sum          string   `json:"sha256_sum" datastore:"sha256_sum"`
+	FileSize           int64    `json:"filesize" datastore:"filesize"`
+	Duplicate          bool     `json:"duplicate" datastore:"duplicate"`
+	Subflows           []string `json:"subflows" datastore:"subflows"`
+	Tags               []string `json:"tags" datastore:"tags"`
+	StorageArea        string   `json:"storage_area" datastore:"storage_area"`
+	Etag               int      `json:"etag" datastore:"etag"`
+	ContentType        string   `json:"content_type" datastore:"content_type"`
+	UpdatedBy          string   `json:"updated_by" datastore:"updated_by"`
+	CreatedBy          string   `json:"created_by" datastore:"created_by"`
+	Encrypted          bool     `json:"encrypted" datastore:"encrypted"`
+	IsEdited           bool     `json:"isedited" datastore:"isedited"`
+	LastEditor         string   `json:"lasteditor" datastore:"lasteditor"`
+	OriginalMd5sum     string   `json:"Originalmd5_sum" datastore:"Originalmd5_sum"`
+	SuborgDistribution []string `json:"suborg_distribution" datastore:"suborg_distribution"`
+
+	// Category control
+	Namespace string `json:"namespace" datastore:"namespace"`
+}
+
+type DisabledRules struct {
+	Files           []File `json:"files"        datastore:"files"`
+	DisabledFolder  bool   `json:"disabled_folder" datastore:"disabled_folder"`
+	DetectionActive string `json:"detection_active"  datastore:"detection_active"`
+	LastActive      int64  `json:"last_active" datastore:"last_active"`
+}
+
+type SelectedDetectionRules struct {
+	SelectedRules []DetectionFileInfo `json:"detection_rules" datastore:"detection_rules"`
+}
+
+type DetectionFileInfo struct {
+	FileName string   `json:"file_name" yaml:"file_name"`
+	FileId   string   `json:"file_id"`
+	Tags     []string `json:"tags" yaml:"tags"`
+
+	RuleTitle   string `json:"title" yaml:"title"`
+	Description string `json:"description" yaml:"description"`
+	IsEnabled   bool   `json:"is_enabled"`
+	Status      string `json:"status" yaml:"status"`
+}
+
+type AppAuthenticationGroup struct {
+	Active      bool   `json:"active" datastore:"active"`
+	Label       string `json:"label" datastore:"label"`
+	Environment string `json:"environment" datastore:"environment"`
+	Id          string `json:"id" datastore:"id"`
+	Description string `json:"description" datastore:"description"`
+	OrgId       string `json:"org_id" datastore:"org_id"`
+	Created     int64  `json:"created" datastore:"created"`
+	Edited      int64  `json:"edited" datastore:"edited"`
+
+	AppAuths []AppAuthenticationStorage `json:"app_auths" datastore:"app_auths,noindex"`
+}
+
+type ValidationProblem struct {
+	Order int `json:"order" datastore:"order"`
+
+	ActionId string `json:"action_id" datastore:"action_id"`
+	AppId    string `json:"app_id" datastore:"app_id"`
+	AppName  string `json:"app_name" datastore:"app_name"`
+	Error    string `json:"error" datastore:"error"`
+
+	Type       string `json:"type" datastore:"type"`
+	WorkflowId string `json:"workflow_id,omitempty" datastore:"workflow_id"`
+
+	// Wait for results or not. IF it's waiting for result, then order is swapped in UI
+	Waiting bool `json:"waiting" datastore:"waiting"`
+}
+
+type TypeValidation struct {
+	Valid                bool  `json:"valid" datastore:"valid"`
+	ChangedAt            int64 `json:"changed_at" datastore:"changed_at"`
+	LastValid            int64 `json:"last_valid" datastore:"last_valid"`
+	ValidationRan        bool  `json:"validation_ran" datastore:"validation_ran"`
+	NotificationsCreated int64 `json:"notifications_created" datastore:"notifications_created"`
+
+	// For the last update, which did it
+	Environment string `json:"environment" datastore:"environment"`
+	WorkflowId  string `json:"workflow_id" datastore:"workflow_id"`
+	ExecutionId string `json:"execution_id" datastore:"execution_id"`
+	NodeId      string `json:"node_id" datastore:"node_id"`
+
+	TotalProblems int                 `json:"total_problems" datastore:"total_problems"`
+	Errors        []ValidationProblem `json:"errors" datastore:"errors"`
+	SubflowApps   []ValidationProblem `json:"subflow_apps" datastore:"subflow_apps"`
+}
+
+type AppAuthenticationStorage struct {
+	Active            bool                  `json:"active" datastore:"active"`
+	Label             string                `json:"label" datastore:"label"`
+	Id                string                `json:"id" datastore:"id"`
+	App               WorkflowApp           `json:"app" datastore:"app,noindex"`
+	Fields            []AuthenticationStore `json:"fields" datastore:"fields"`
+	Usage             []AuthenticationUsage `json:"usage" datastore:"usage"`
+	WorkflowCount     int64                 `json:"workflow_count" datastore:"workflow_count"`
+	NodeCount         int64                 `json:"node_count" datastore:"node_count"`
+	OrgId             string                `json:"org_id" datastore:"org_id"`
+	Created           int64                 `json:"created" datastore:"created"`
+	Edited            int64                 `json:"edited" datastore:"edited"`
+	Defined           bool                  `json:"defined" datastore:"defined"`
+	Type              string                `json:"type" datastore:"type"`
+	Encrypted         bool                  `json:"encrypted" datastore:"encrypted"`
+	ReferenceWorkflow string                `json:"reference_workflow" datastore:"reference_workflow"`
+	AutoDistribute    bool                  `json:"auto_distribute" datastore:"auto_distribute"`
+
+	Environment string `json:"environment" datastore:"environment"` // In case an auth should ALWAYS be mapped to an environment. Can help out with Oauth2 refresh (e.g. running partially on cloud and partially onprem), as well as for KMS. For now ONLY KMS has a frontend.
+
+	SuborgDistributed bool `json:"suborg_distributed" datastore:"suborg_distributed"` // Decides if it's distributed to suborgs or not
+
+	SuborgDistribution []string `json:"suborg_distribution" datastore:"suborg_distribution"`
+
+	Validation TypeValidation `json:"validation" datastore:"validation"`
+}
+
+type PasswordChange struct {
+	Username        string `json:"username"`
+	Newpassword     string `json:"newpassword"`
+	Newpassword2    string `json:"newpassword2"`
+	Currentpassword string `json:"currentpassword"`
+}
+
+// Primary = usually an outer ID, e.g. workflow ID
+// Secondary = something to specify what inside workflow to execute
+// Third = Some data to add to it
+type CloudSyncJob struct {
+	Id            string `json:"id" datastore:"id"`
+	Type          string `json:"type" datastore:"type"`
+	Action        string `json:"action" datastore:"action"`
+	OrgId         string `json:"org_id" datastore:"org_id"`
+	PrimaryItemId string `json:"primary_item_id" datastore:"primary_item_id"`
+	SecondaryItem string `json:"secondary_item" datastore:"secondary_item"`
+	ThirdItem     string `json:"third_item" datastore:"third_item"`
+	FourthItem    string `json:"fourth_item" datastore:"fourth_item"`
+	FifthItem     string `json:"fifth_item" datastore:"fifth_item"`
+	Created       string `json:"created" datastore:"created"`
+}
+
+type loginStruct struct {
+	Username string `json:"username"`
+	Password string `json:"password"`
+	MFACode  string `json:"mfa_code"`
+	SSO      bool   `json:"sso"`
+}
+
+type ExecutionVariableWrapper struct {
+	StartNode    string              `json:"startnode"`
+	Children     map[string][]string `json:"children"`
+	Parents      map[string][]string `json:"parents""`
+	Visited      []string            `json:"visited"`
+	Executed     []string            `json:"executed"`
+	NextActions  []string            `json:"nextActions"`
+	Environments []string            `json:"environments"`
+	Extra        int                 `json:"extra"`
+}
+
+type MinimizedApps struct {
+	Name     string `json:"name"`
+	Image    string `json:"image"`
+	Category string `json:"category"`
+}
+
+type AlgoliaSearchCreator struct {
+	ObjectID        string          `json:"objectID"`
+	TimeEdited      int64           `json:"time_edited"`
+	Username        string          `json:"username"`
+	Image           string          `json:"image"`
+	Banner          string          `datastore:"banner" json:"banner"`
+	Skills          []string        `json:"skills"`
+	Synonyms        []string        `json:"synonyms"`
+	Workflows       int64           `json:"workflows"`
+	Apps            int64           `json:"apps"`
+	SpecializedApps []MinimizedApps `json:"specialized_apps"`
+	Verified        bool            `json:"verified"`
+	Social          []string        `datastore:"social" json:"social"`
+	WorkStatus      string          `datastore:"work_status" json:"work_status"`
+	Url             string          `datastore:"url" json:"url"`
+	IsOrg           bool            `datastore:"is_org" json:"is_org"`
+}
+
+type AlgoliaSearchPartner struct {
+	ObjectID    string   `json:"objectID"`
+	TimeEdited  int64    `json:"time_edited"`
+	SquareImage string   `json:"square_image"`
+	Name        string   `json:"name"`
+	Description string   `json:"description"`
+	PartnerType []string `json:"partner_type"`
+	Solutions   []string `json:"solutions"`
+	Country     string   `json:"country"`
+	Region      string   `json:"region"`
+	OrgId       string   `json:"org_id"`
+}
+
+type AlgoliaSearchUsecase struct {
+	ObjectID           string   `json:"objectID"`
+	PartnerName        string   `json:"partner_name"`
+	PartnerId          string   `json:"partner_id"`
+	Name               string   `json:"name"`
+	Description        string   `json:"description"`
+	Categories         []string `json:"categories"`
+	PublicWorkflowID   string   `json:"public_workflow_id"`
+	SourceAppType      string   `json:"source_app_type"`
+	DestinationAppType string   `json:"destination_app_type"`
+	TimeEdited         int64    `json:"time_edited"`
+}
+
+type AlgoliaSearchWorkflow struct {
+	Name             string            `json:"name"`
+	ObjectID         string            `json:"objectID"`
+	Description      string            `json:"description"`
+	Variables        int               `json:"variables"`
+	ActionAmount     int               `json:"action_amount"`
+	TriggerAmount    int               `json:"trigger_amount"`
+	Triggers         []string          `json:"triggers"`
+	Actions          []string          `json:"actions"`
+	Tags             []string          `json:"tags"`
+	Categories       []string          `json:"categories"`
+	AccessibleBy     []string          `json:"accessible_by,omitempty"`
+	ImageUrl         string            `json:"image_url"`
+	TimeEdited       int64             `json:"time_edited"`
+	Invalid          bool              `json:"invalid"`
+	Creator          string            `json:"creator,omitempty"`
+	SourceIPLower    string            `json:"source_ip,omitempty"`
+	SourceIP         string            `json:"SourceIP,omitempty"`
+	Type             string            `json:"type"`
+	UsecaseIds       []string          `json:"usecase_ids"`
+	CreatorInfo      CreatorInfo       `json:"creator_info,omitempty"`
+	ActionReferences []ActionReference `json:"action_references,omitempty"`
+	Priority         int               `json:"priority"`
+	Validated        bool              `json:"validated"`
+}
+
+type ActionReference struct {
+	Name       string   `json:"name"`
+	Id         string   `json:"id"`
+	ImageUrl   string   `json:"image_url"`
+	ActionName []string `json:"action_name"`
+}
+
+type CreatorInfo struct {
+	Username string `json:"username"`
+	Image    string `json:"image"`
+}
+
+type AlgoliaSearchApp struct {
+	Name         string   `json:"name"`
+	Description  string   `json:"description"`
+	ObjectID     string   `json:"objectID"`
+	Creator      string   `json:"creator"`
+	AppVersion   string   `json:"app_version"`
+	ImageUrl     string   `json:"image_url"`
+	TimeEdited   int64    `json:"time_edited"`
+	Generated    bool     `json:"generated"`
+	Invalid      bool     `json:"invalid"`
+	Priority     int      `json:"priority"`
+	Actions      int      `json:"actions"`
+	Tags         []string `json:"tags"`
+	AccessibleBy []string `json:"accessible_by"`
+	Categories   []string `json:"categories"`
+	ActionLabels []string `json:"action_labels"`
+	Triggers     []string `json:"triggers"`
+	Verified     bool     `json:"verified"`
+}
+
+type ExecutionStruct struct {
+	Start             string `json:"start"`
+	ExecutionSource   string `json:"execution_source"`
+	ExecutionArgument string `json:"execution_argument"`
+}
+
+type OauthToken struct {
+	AccessToken  string    `json:"AccessToken" datastore:"AccessToken,noindex"`
+	TokenType    string    `json:"TokenType" datastore:"TokenType,noindex"`
+	RefreshToken string    `json:"RefreshToken" datastore:"RefreshToken,noindex"`
+	Expiry       time.Time `json:"Expiry" datastore:"Expiry,noindex"`
+}
+
+type TriggerAuth struct {
+	Id             string `json:"id" datastore:"id"`
+	SubscriptionId string `json:"subscriptionId" datastore:"subscriptionId"`
+
+	Username       string     `json:"username" datastore:"username,noindex"`
+	Owner          string     `json:"owner" datastore:"owner"`
+	OrgId          string     `json:"org_id" datastore:"org_id"`
+	Type           string     `json:"type" datastore:"type"`
+	Code           string     `json:"code,omitempty" datastore:"code,noindex"`
+	WorkflowId     string     `json:"workflow_id" datastore:"workflow_id,noindex"`
+	Start          string     `json:"start" datastore:"start"`
+	OauthToken     OauthToken `json:"oauth_token,omitempty" datastore:"oauth_token"`
+	AssociatedUser string     `json:"associated_user" yaml:"associated_user" datastore:"associated_user"`
+	Folders        []string   `json:"folders" yaml:"folders" datastore:"folders"`
+}
+
+// This is what the structure should be when it's sent into a workflow
+type ParsedShuffleMail struct {
+	Body struct {
+		URI           []string `json:"uri"`
+		Email         []string `json:"email"`
+		Domain        []string `json:"domain"`
+		ContentHeader struct {
+		} `json:"content_header"`
+		Content     string `json:"content"`
+		ContentType string `json:"content_type"`
+		Hash        string `json:"hash"`
+		RawBody     string `json:"raw_body"`
+	} `json:"body"`
+	Header struct {
+		Subject  string   `json:"subject"`
+		From     string   `json:"from"`
+		To       []string `json:"to"`
+		Date     string   `json:"date"`
+		Received []struct {
+			Src  string   `json:"src"`
+			From []string `json:"from"`
+			By   []string `json:"by"`
+			With string   `json:"with"`
+			Date string   `json:"date"`
+		} `json:"received"`
+		ReceivedDomain []string `json:"received_domain"`
+		ReceivedIP     []string `json:"received_ip"`
+		Header         struct {
+		} `json:"header"`
+	} `json:"header"`
+	MessageID      string   `json:"message_id"`
+	EmailFileid    string   `json:"email_fileid"`
+	AttachmentUids []string `json:"attachment_uids"`
+}
+
+type FullEmail struct {
+	OdataContext               string        `json:"@odata.context"`
+	OdataEtag                  string        `json:"@odata.etag"`
+	ID                         string        `json:"id"`
+	Createddatetime            time.Time     `json:"createdDateTime"`
+	Lastmodifieddatetime       time.Time     `json:"lastModifiedDateTime"`
+	Changekey                  string        `json:"changeKey"`
+	Categories                 []interface{} `json:"categories"`
+	Receiveddatetime           time.Time     `json:"receivedDateTime"`
+	Sentdatetime               time.Time     `json:"sentDateTime"`
+	Hasattachments             bool          `json:"hasAttachments"`
+	Internetmessageid          string        `json:"internetMessageId"`
+	Subject                    string        `json:"subject"`
+	Bodypreview                string        `json:"bodyPreview"`
+	Importance                 string        `json:"importance"`
+	Parentfolderid             string        `json:"parentFolderId"`
+	Conversationid             string        `json:"conversationId"`
+	Conversationindex          string        `json:"conversationIndex"`
+	Isdeliveryreceiptrequested interface{}   `json:"isDeliveryReceiptRequested"`
+	Isreadreceiptrequested     bool          `json:"isReadReceiptRequested"`
+	Isread                     bool          `json:"isRead"`
+	Isdraft                    bool          `json:"isDraft"`
+	Weblink                    string        `json:"webLink"`
+	Inferenceclassification    string        `json:"inferenceClassification"`
+	Body                       struct {
+		Contenttype string `json:"contentType"`
+		Content     string `json:"content"`
+	} `json:"body"`
+	Sender struct {
+		Emailaddress struct {
+			Name    string `json:"name"`
+			Address string `json:"address"`
+		} `json:"emailAddress"`
+	} `json:"sender"`
+	From struct {
+		Emailaddress struct {
+			Name    string `json:"name"`
+			Address string `json:"address"`
+		} `json:"emailAddress"`
+	} `json:"from"`
+	Torecipients []struct {
+		Emailaddress struct {
+			Name    string `json:"name"`
+			Address string `json:"address"`
+		} `json:"emailAddress"`
+	} `json:"toRecipients"`
+	Ccrecipients  []interface{} `json:"ccRecipients"`
+	Bccrecipients []interface{} `json:"bccRecipients"`
+	Replyto       []interface{} `json:"replyTo"`
+	Flag          struct {
+		Flagstatus string `json:"flagStatus"`
+	} `json:"flag"`
+	Attachments []struct {
+		OdataType             string      `json:"@odata.type"`
+		OdataMediacontenttype string      `json:"@odata.mediaContentType"`
+		ID                    string      `json:"id"`
+		Lastmodifieddatetime  time.Time   `json:"lastModifiedDateTime"`
+		Name                  string      `json:"name"`
+		Contenttype           string      `json:"contentType"`
+		Size                  int         `json:"size"`
+		Isinline              bool        `json:"isInline"`
+		Contentid             interface{} `json:"contentId"`
+		Contentlocation       interface{} `json:"contentLocation"`
+		Contentbytes          string      `json:"contentBytes"`
+	} `json:"attachments"`
+	FileIds []string `json:"file_ids"`
+}
+
+type OutlookAttachment struct {
+	OdataContext          string      `json:"@odata.context"`
+	OdataType             string      `json:"@odata.type"`
+	OdataMediaContentType string      `json:"@odata.mediaContentType"`
+	ID                    string      `json:"id"`
+	LastModifiedDateTime  time.Time   `json:"lastModifiedDateTime"`
+	Name                  string      `json:"name"`
+	ContentType           string      `json:"contentType"`
+	Size                  int         `json:"size"`
+	IsInline              bool        `json:"isInline"`
+	ContentID             interface{} `json:"contentId"`
+	ContentLocation       interface{} `json:"contentLocation"`
+	ContentBytes          string      `json:"contentBytes"`
+}
+
+type MailDataOutlookList struct {
+	OdataContext string `json:"@odata.context"`
+	Value        []struct {
+		OdataType             string      `json:"@odata.type"`
+		OdataMediaContentType string      `json:"@odata.mediaContentType"`
+		ID                    string      `json:"id"`
+		LastModifiedDateTime  time.Time   `json:"lastModifiedDateTime"`
+		Name                  string      `json:"name"`
+		ContentType           string      `json:"contentType"`
+		Size                  int         `json:"size"`
+		IsInline              bool        `json:"isInline"`
+		ContentID             interface{} `json:"contentId"`
+		ContentLocation       interface{} `json:"contentLocation"`
+		ContentBytes          string      `json:"contentBytes"`
+	} `json:"value"`
+}
+
+type MailDataOutlook struct {
+	Value []struct {
+		Subscriptionid                 string `json:"subscriptionId"`
+		Subscriptionexpirationdatetime string `json:"subscriptionExpirationDateTime"`
+		Changetype                     string `json:"changeType"`
+		Resource                       string `json:"resource"`
+		Resourcedata                   struct {
+			OdataType string `json:"@odata.type"`
+			OdataID   string `json:"@odata.id"`
+			OdataEtag string `json:"@odata.etag"`
+			ID        string `json:"id"`
+		} `json:"resourceData"`
+		Clientstate string `json:"clientState"`
+		Tenantid    string `json:"tenantId"`
+	} `json:"value"`
+}
+
+type OutlookProfile struct {
+	OdataContext      string      `json:"@odata.context"`
+	BusinessPhones    []string    `json:"businessPhones"`
+	DisplayName       string      `json:"displayName"`
+	GivenName         string      `json:"givenName"`
+	JobTitle          interface{} `json:"jobTitle"`
+	Mail              string      `json:"mail"`
+	MobilePhone       interface{} `json:"mobilePhone"`
+	OfficeLocation    interface{} `json:"officeLocation"`
+	PreferredLanguage interface{} `json:"preferredLanguage"`
+	Surname           string      `json:"surname"`
+	UserPrincipalName string      `json:"userPrincipalName"`
+	ID                string      `json:"id"`
+}
+
+type GmailLabels struct {
+	Labels []GmailLabel `json:"labels"`
+}
+
+type GmailLabel struct {
+	ID                    string `json:"id"`
+	Name                  string `json:"name"`
+	MessageListVisibility string `json:"messageListVisibility"`
+	LabelListVisibility   string `json:"labelListVisibility"`
+	Type                  string `json:"type"`
+}
+
+type OutlookFolder struct {
+	ID               string `json:"id"`
+	DisplayName      string `json:"displayName"`
+	ParentFolderID   string `json:"parentFolderId"`
+	ChildFolderCount int    `json:"childFolderCount"`
+	UnreadItemCount  int    `json:"unreadItemCount"`
+	TotalItemCount   int    `json:"totalItemCount"`
+}
+
+type OutlookFolders struct {
+	OdataContext  string          `json:"@odata.context"`
+	OdataNextLink string          `json:"@odata.nextLink"`
+	Value         []OutlookFolder `json:"value"`
+}
+
+type StatisticsData struct {
+	Timestamp int64  `json:"timestamp" datastore:"timestamp"`
+	Id        string `json:"id" datastore:"id"`
+	Amount    int64  `json:"amount" datastore:"amount"`
+}
+
+type StatisticsItem struct {
+	Total     int64            `json:"total" datastore:"total"`
+	Fieldname string           `json:"field_name" datastore:"field_name"`
+	Data      []StatisticsData `json:"data" datastore:"data"`
+	OrgId     string           `json:"org_id" datastore:"org_id"`
+}
+
+type HealthCheckSearchWrapper struct {
+	Took     int  `json:"took"`
+	TimedOut bool `json:"timed_out"`
+	Shards   struct {
+		Total      int `json:"total"`
+		Successful int `json:"successful"`
+		Skipped    int `json:"skipped"`
+		Failed     int `json:"failed"`
+	} `json:"_shards"`
+	Hits struct {
+		Total struct {
+			Value    int    `json:"value"`
+			Relation string `json:"relation"`
+		} `json:"total"`
+		MaxScore float64 `json:"max_score"`
+		Hits     []struct {
+			Index  string        `json:"_index"`
+			Type   string        `json:"_type"`
+			ID     string        `json:"_id"`
+			Score  float64       `json:"_score"`
+			Source HealthCheckDB `json:"_source"`
+		} `json:"hits"`
+	} `json:"hits"`
+}
+
+type NewValueSearchWrapper struct {
+	Took     int  `json:"took"`
+	TimedOut bool `json:"timed_out"`
+	Shards   struct {
+		Total      int `json:"total"`
+		Successful int `json:"successful"`
+		Skipped    int `json:"skipped"`
+		Failed     int `json:"failed"`
+	} `json:"_shards"`
+	Hits struct {
+		Total struct {
+			Value    int    `json:"value"`
+			Relation string `json:"relation"`
+		} `json:"total"`
+		MaxScore float64 `json:"max_score"`
+		Hits     []struct {
+			Index  string   `json:"_index"`
+			Type   string   `json:"_type"`
+			ID     string   `json:"_id"`
+			Score  float64  `json:"_score"`
+			Source NewValue `json:"_source"`
+		} `json:"hits"`
+	} `json:"hits"`
+}
+
+type ExecutionInfoWrapper struct {
+	Index       string        `json:"_index"`
+	Type        string        `json:"_type"`
+	ID          string        `json:"_id"`
+	Version     int           `json:"_version"`
+	SeqNo       int           `json:"_seq_no"`
+	PrimaryTerm int           `json:"_primary_term"`
+	Found       bool          `json:"found"`
+	Source      ExecutionInfo `json:"_source"`
+}
+
+type EnvironentSearchWrapper struct {
+	Took     int  `json:"took"`
+	TimedOut bool `json:"timed_out"`
+	Shards   struct {
+		Total      int `json:"total"`
+		Successful int `json:"successful"`
+		Skipped    int `json:"skipped"`
+		Failed     int `json:"failed"`
+	} `json:"_shards"`
+	Hits struct {
+		Total struct {
+			Value    int    `json:"value"`
+			Relation string `json:"relation"`
+		} `json:"total"`
+		MaxScore float64 `json:"max_score"`
+		Hits     []struct {
+			Index  string      `json:"_index"`
+			Type   string      `json:"_type"`
+			ID     string      `json:"_id"`
+			Score  float64     `json:"_score"`
+			Source Environment `json:"_source"`
+		} `json:"hits"`
+	} `json:"hits"`
+}
+
+type OpenseaAssetSearchWrapper struct {
+	Took     int  `json:"took"`
+	TimedOut bool `json:"timed_out"`
+	Shards   struct {
+		Total      int `json:"total"`
+		Successful int `json:"successful"`
+		Skipped    int `json:"skipped"`
+		Failed     int `json:"failed"`
+	} `json:"_shards"`
+	Hits struct {
+		Total struct {
+			Value    int    `json:"value"`
+			Relation string `json:"relation"`
+		} `json:"total"`
+		MaxScore float64 `json:"max_score"`
+		Hits     []struct {
+			Index  string       `json:"_index"`
+			Type   string       `json:"_type"`
+			ID     string       `json:"_id"`
+			Score  float64      `json:"_score"`
+			Source OpenseaAsset `json:"_source"`
+		} `json:"hits"`
+	} `json:"hits"`
+}
+
+type ExecutionSearchWrapper struct {
+	Took     int  `json:"took"`
+	TimedOut bool `json:"timed_out"`
+	Shards   struct {
+		Total      int `json:"total"`
+		Successful int `json:"successful"`
+		Skipped    int `json:"skipped"`
+		Failed     int `json:"failed"`
+	} `json:"_shards"`
+	Hits struct {
+		Total struct {
+			Value    int    `json:"value"`
+			Relation string `json:"relation"`
+		} `json:"total"`
+		MaxScore float64 `json:"max_score"`
+		Hits     []struct {
+			Index  string            `json:"_index"`
+			Type   string            `json:"_type"`
+			ID     string            `json:"_id"`
+			Score  float64           `json:"_score"`
+			Source WorkflowExecution `json:"_source"`
+		} `json:"hits"`
+	} `json:"hits"`
+}
+
+type OrgSearchWrapper struct {
+	Took     int  `json:"took"`
+	TimedOut bool `json:"timed_out"`
+	Shards   struct {
+		Total      int `json:"total"`
+		Successful int `json:"successful"`
+		Skipped    int `json:"skipped"`
+		Failed     int `json:"failed"`
+	} `json:"_shards"`
+	Hits struct {
+		Total struct {
+			Value    int    `json:"value"`
+			Relation string `json:"relation"`
+		} `json:"total"`
+		MaxScore float64 `json:"max_score"`
+		Hits     []struct {
+			Index  string  `json:"_index"`
+			Type   string  `json:"_type"`
+			ID     string  `json:"_id"`
+			Score  float64 `json:"_score"`
+			Source Org     `json:"_source"`
+		} `json:"hits"`
+	} `json:"hits"`
+}
+
+type AppSearchWrapper struct {
+	Took     int  `json:"took"`
+	TimedOut bool `json:"timed_out"`
+	Shards   struct {
+		Total      int `json:"total"`
+		Successful int `json:"successful"`
+		Skipped    int `json:"skipped"`
+		Failed     int `json:"failed"`
+	} `json:"_shards"`
+	Hits struct {
+		Total struct {
+			Value    int    `json:"value"`
+			Relation string `json:"relation"`
+		} `json:"total"`
+		MaxScore float64 `json:"max_score"`
+		Hits     []struct {
+			Index  string      `json:"_index"`
+			Type   string      `json:"_type"`
+			ID     string      `json:"_id"`
+			Score  float64     `json:"_score"`
+			Source WorkflowApp `json:"_source"`
+		} `json:"hits"`
+	} `json:"hits"`
+}
+
+type ScheduleSearchWrapper struct {
+	Took     int  `json:"took"`
+	TimedOut bool `json:"timed_out"`
+	Shards   struct {
+		Total      int `json:"total"`
+		Successful int `json:"successful"`
+		Skipped    int `json:"skipped"`
+		Failed     int `json:"failed"`
+	} `json:"_shards"`
+	Hits struct {
+		Total struct {
+			Value    int    `json:"value"`
+			Relation string `json:"relation"`
+		} `json:"total"`
+		MaxScore float64 `json:"max_score"`
+		Hits     []struct {
+			Index  string      `json:"_index"`
+			Type   string      `json:"_type"`
+			ID     string      `json:"_id"`
+			Score  float64     `json:"_score"`
+			Source ScheduleOld `json:"_source"`
+		} `json:"hits"`
+	} `json:"hits"`
+}
+
+type NotificationSearchWrapper struct {
+	Took     int  `json:"took"`
+	TimedOut bool `json:"timed_out"`
+	Shards   struct {
+		Total      int `json:"total"`
+		Successful int `json:"successful"`
+		Skipped    int `json:"skipped"`
+		Failed     int `json:"failed"`
+	} `json:"_shards"`
+	Hits struct {
+		Total struct {
+			Value    int    `json:"value"`
+			Relation string `json:"relation"`
+		} `json:"total"`
+		MaxScore float64 `json:"max_score"`
+		Hits     []struct {
+			Index  string       `json:"_index"`
+			Type   string       `json:"_type"`
+			ID     string       `json:"_id"`
+			Score  float64      `json:"_score"`
+			Source Notification `json:"_source"`
+		} `json:"hits"`
+	} `json:"hits"`
+}
+
+type FileSearchWrapper struct {
+	Took     int  `json:"took"`
+	TimedOut bool `json:"timed_out"`
+	Shards   struct {
+		Total      int `json:"total"`
+		Successful int `json:"successful"`
+		Skipped    int `json:"skipped"`
+		Failed     int `json:"failed"`
+	} `json:"_shards"`
+	Hits struct {
+		Total struct {
+			Value    int    `json:"value"`
+			Relation string `json:"relation"`
+		} `json:"total"`
+		MaxScore float64 `json:"max_score"`
+		Hits     []struct {
+			Index  string  `json:"_index"`
+			Type   string  `json:"_type"`
+			ID     string  `json:"_id"`
+			Score  float64 `json:"_score"`
+			Source File    `json:"_source"`
+		} `json:"hits"`
+	} `json:"hits"`
+}
+
+type NGramSearchWrapper struct {
+	Took     int  `json:"took"`
+	TimedOut bool `json:"timed_out"`
+	Shards   struct {
+		Total      int `json:"total"`
+		Successful int `json:"successful"`
+		Skipped    int `json:"skipped"`
+		Failed     int `json:"failed"`
+	} `json:"_shards"`
+	Hits struct {
+		Total struct {
+			Value    int    `json:"value"`
+			Relation string `json:"relation"`
+		} `json:"total"`
+		MaxScore float64 `json:"max_score"`
+		Hits     []struct {
+			Index  string    `json:"_index"`
+			Type   string    `json:"_type"`
+			ID     string    `json:"_id"`
+			Score  float64   `json:"_score"`
+			Source NGramItem `json:"_source"`
+		} `json:"hits"`
+	} `json:"hits"`
+}
+
+type WorkflowSearchWrapper struct {
+	Took     int  `json:"took"`
+	TimedOut bool `json:"timed_out"`
+	Shards   struct {
+		Total      int `json:"total"`
+		Successful int `json:"successful"`
+		Skipped    int `json:"skipped"`
+		Failed     int `json:"failed"`
+	} `json:"_shards"`
+	Hits struct {
+		Total struct {
+			Value    int    `json:"value"`
+			Relation string `json:"relation"`
+		} `json:"total"`
+		MaxScore float64 `json:"max_score"`
+		Hits     []struct {
+			Index  string   `json:"_index"`
+			Type   string   `json:"_type"`
+			ID     string   `json:"_id"`
+			Score  float64  `json:"_score"`
+			Source Workflow `json:"_source"`
+		} `json:"hits"`
+	} `json:"hits"`
+}
+
+type EnvironmentSearchWrapper struct {
+	Took     int  `json:"took"`
+	TimedOut bool `json:"timed_out"`
+	Shards   struct {
+		Total      int `json:"total"`
+		Successful int `json:"successful"`
+		Skipped    int `json:"skipped"`
+		Failed     int `json:"failed"`
+	} `json:"_shards"`
+	Hits struct {
+		Total struct {
+			Value    int    `json:"value"`
+			Relation string `json:"relation"`
+		} `json:"total"`
+		MaxScore float64 `json:"max_score"`
+		Hits     []struct {
+			Index  string      `json:"_index"`
+			Type   string      `json:"_type"`
+			ID     string      `json:"_id"`
+			Score  float64     `json:"_score"`
+			Source Environment `json:"_source"`
+		} `json:"hits"`
+	} `json:"hits"`
+}
+
+type ExecRequestSearchWrapper struct {
+	Took     int  `json:"took"`
+	TimedOut bool `json:"timed_out"`
+	Shards   struct {
+		Total      int `json:"total"`
+		Successful int `json:"successful"`
+		Skipped    int `json:"skipped"`
+		Failed     int `json:"failed"`
+	} `json:"_shards"`
+	Hits struct {
+		Total struct {
+			Value    int    `json:"value"`
+			Relation string `json:"relation"`
+		} `json:"total"`
+		MaxScore float64 `json:"max_score"`
+		Hits     []struct {
+			Index  string           `json:"_index"`
+			Type   string           `json:"_type"`
+			ID     string           `json:"_id"`
+			Score  float64          `json:"_score"`
+			Source ExecutionRequest `json:"_source"`
+		} `json:"hits"`
+	} `json:"hits"`
+}
+
+type AppAuthSearchWrapper struct {
+	Took     int  `json:"took"`
+	TimedOut bool `json:"timed_out"`
+	Shards   struct {
+		Total      int `json:"total"`
+		Successful int `json:"successful"`
+		Skipped    int `json:"skipped"`
+		Failed     int `json:"failed"`
+	} `json:"_shards"`
+	Hits struct {
+		Total struct {
+			Value    int    `json:"value"`
+			Relation string `json:"relation"`
+		} `json:"total"`
+		MaxScore float64 `json:"max_score"`
+		Hits     []struct {
+			Index  string                   `json:"_index"`
+			Type   string                   `json:"_type"`
+			ID     string                   `json:"_id"`
+			Score  float64                  `json:"_score"`
+			Source AppAuthenticationStorage `json:"_source"`
+		} `json:"hits"`
+	} `json:"hits"`
+}
+
+type UserSearchWrapper struct {
+	Took     int  `json:"took"`
+	TimedOut bool `json:"timed_out"`
+	Shards   struct {
+		Total      int `json:"total"`
+		Successful int `json:"successful"`
+		Skipped    int `json:"skipped"`
+		Failed     int `json:"failed"`
+	} `json:"_shards"`
+	Hits struct {
+		Total struct {
+			Value    int    `json:"value"`
+			Relation string `json:"relation"`
+		} `json:"total"`
+		MaxScore float64 `json:"max_score"`
+		Hits     []struct {
+			Index  string  `json:"_index"`
+			Type   string  `json:"_type"`
+			ID     string  `json:"_id"`
+			Score  float64 `json:"_score"`
+			Source User    `json:"_source"`
+		} `json:"hits"`
+	} `json:"hits"`
+}
+
+type SessionWrapper struct {
+	Index       string  `json:"_index"`
+	Type        string  `json:"_type"`
+	ID          string  `json:"_id"`
+	Version     int     `json:"_version"`
+	SeqNo       int     `json:"_seq_no"`
+	PrimaryTerm int     `json:"_primary_term"`
+	Found       bool    `json:"found"`
+	Source      Session `json:"_source"`
+}
+
+// Used for Gmail triggers using Pubsub
+type SubscriptionRecipient struct {
+	HistoryId    string `json:"history_id"`
+	TriggerId    string `json:"trigger_id"`
+	Edited       int    `json:"edited"`
+	Expiration   string `json:"expiration"`
+	LastSync     int    `json:"last_sync"`
+	WorkflowId   string `json:"workflow_id`
+	Startnode    string `json:"startnode`
+	IsCloud      bool   `json:"is_cloud"`
+	EmailAddress string `json:"email_address"`
+}
+
+type GmailProfile struct {
+	EmailAddress  string `json:"emailAddress"`
+	MessagesTotal int    `json:"messagesTotal"`
+	ThreadsTotal  int    `json:"threadsTotal"`
+	HistoryId     string `json:"historyId"`
+}
+
+type SubResponse struct {
+	HistoryId  string `json:"historyId"`
+	Expiration string `json:"expiration`
+}
+
+type AllTriggersWrapper struct {
+	Pipelines []PipelineInfo `json:"pipelines"`
+	WebHooks  []Hook         `json:"webhooks"`
+	Schedules []ScheduleOld  `json:"schedules"`
+}
+
+type SubWrapper struct {
+	Index       string                `json:"_index"`
+	Type        string                `json:"_type"`
+	ID          string                `json:"_id"`
+	Version     int                   `json:"_version"`
+	SeqNo       int                   `json:"_seq_no"`
+	PrimaryTerm int                   `json:"_primary_term"`
+	Found       bool                  `json:"found"`
+	Source      SubscriptionRecipient `json:"_source"`
+}
+
+type EnvWrapper struct {
+	Index       string      `json:"_index"`
+	Type        string      `json:"_type"`
+	ID          string      `json:"_id"`
+	Version     int         `json:"_version"`
+	SeqNo       int         `json:"_seq_no"`
+	PrimaryTerm int         `json:"_primary_term"`
+	Found       bool        `json:"found"`
+	Source      Environment `json:"_source"`
+}
+
+type AuthGroupWrapper struct {
+	Index       string                 `json:"_index"`
+	Type        string                 `json:"_type"`
+	ID          string                 `json:"_id"`
+	Version     int                    `json:"_version"`
+	SeqNo       int                    `json:"_seq_no"`
+	PrimaryTerm int                    `json:"_primary_term"`
+	Found       bool                   `json:"found"`
+	Source      AppAuthenticationGroup `json:"_source"`
+}
+
+type NgramItemWrapper struct {
+	Index       string    `json:"_index"`
+	Type        string    `json:"_type"`
+	ID          string    `json:"_id"`
+	Version     int       `json:"_version"`
+	SeqNo       int       `json:"_seq_no"`
+	PrimaryTerm int       `json:"_primary_term"`
+	Found       bool      `json:"found"`
+	Source      NGramItem `json:"_source"`
+}
+
+type WorkflowWrapper struct {
+	Index       string   `json:"_index"`
+	Type        string   `json:"_type"`
+	ID          string   `json:"_id"`
+	Version     int      `json:"_version"`
+	SeqNo       int      `json:"_seq_no"`
+	PrimaryTerm int      `json:"_primary_term"`
+	Found       bool     `json:"found"`
+	Source      Workflow `json:"_source"`
+}
+
+type UsecaseWrapper struct {
+	Index       string  `json:"_index"`
+	Type        string  `json:"_type"`
+	ID          string  `json:"_id"`
+	Version     int     `json:"_version"`
+	SeqNo       int     `json:"_seq_no"`
+	PrimaryTerm int     `json:"_primary_term"`
+	Found       bool    `json:"found"`
+	Source      Usecase `json:"_source"`
+}
+
+type AppWrapper struct {
+	Index       string      `json:"_index"`
+	Type        string      `json:"_type"`
+	ID          string      `json:"_id"`
+	Version     int         `json:"_version"`
+	SeqNo       int         `json:"_seq_no"`
+	PrimaryTerm int         `json:"_primary_term"`
+	Found       bool        `json:"found"`
+	Source      WorkflowApp `json:"_source"`
+}
+
+type OpenseaAssetWrapper struct {
+	Index       string       `json:"_index"`
+	Type        string       `json:"_type"`
+	ID          string       `json:"_id"`
+	Version     int          `json:"_version"`
+	SeqNo       int          `json:"_seq_no"`
+	PrimaryTerm int          `json:"_primary_term"`
+	Found       bool         `json:"found"`
+	Source      OpenseaAsset `json:"_source"`
+}
+
+type ExecWrapper struct {
+	Index       string            `json:"_index"`
+	Type        string            `json:"_type"`
+	ID          string            `json:"_id"`
+	Version     int               `json:"_version"`
+	SeqNo       int               `json:"_seq_no"`
+	PrimaryTerm int               `json:"_primary_term"`
+	Found       bool              `json:"found"`
+	Source      WorkflowExecution `json:"_source"`
+}
+
+type OrgWrapper struct {
+	Index       string `json:"_index"`
+	Type        string `json:"_type"`
+	ID          string `json:"_id"`
+	Version     int    `json:"_version"`
+	SeqNo       int    `json:"_seq_no"`
+	PrimaryTerm int    `json:"_primary_term"`
+	Found       bool   `json:"found"`
+	Source      Org    `json:"_source"`
+}
+
+type TriggerAuthWrapper struct {
+	Index       string      `json:"_index"`
+	Type        string      `json:"_type"`
+	ID          string      `json:"_id"`
+	Version     int         `json:"_version"`
+	SeqNo       int         `json:"_seq_no"`
+	PrimaryTerm int         `json:"_primary_term"`
+	Found       bool        `json:"found"`
+	Source      TriggerAuth `json:"_source"`
+}
+
+type AppAuthWrapper struct {
+	Index       string                   `json:"_index"`
+	Type        string                   `json:"_type"`
+	ID          string                   `json:"_id"`
+	Version     int                      `json:"_version"`
+	SeqNo       int                      `json:"_seq_no"`
+	PrimaryTerm int                      `json:"_primary_term"`
+	Found       bool                     `json:"found"`
+	Source      AppAuthenticationStorage `json:"_source"`
+}
+
+type NotificationWrapper struct {
+	Index       string       `json:"_index"`
+	Type        string       `json:"_type"`
+	ID          string       `json:"_id"`
+	Version     int          `json:"_version"`
+	SeqNo       int          `json:"_seq_no"`
+	PrimaryTerm int          `json:"_primary_term"`
+	Found       bool         `json:"found"`
+	Source      Notification `json:"_source"`
+}
+
+type FileWrapper struct {
+	Index       string `json:"_index"`
+	Type        string `json:"_type"`
+	ID          string `json:"_id"`
+	Version     int    `json:"_version"`
+	SeqNo       int    `json:"_seq_no"`
+	PrimaryTerm int    `json:"_primary_term"`
+	Found       bool   `json:"found"`
+	Source      File   `json:"_source"`
+}
+
+type OAuthClient struct {
+	ID                      string   `json:"id" datastore:"id"`
+	ClientID                string   `json:"client_id" datastore:"client_id"`
+	ClientSecret            string   `json:"client_secret,omitempty" datastore:"client_secret,noindex"`
+	ClientName              string   `json:"client_name" datastore:"client_name"`
+	RedirectUris            []string `json:"redirect_uris" datastore:"redirect_uris"`
+	GrantTypes              []string `json:"grant_types" datastore:"grant_types"`
+	ResponseTypes           []string `json:"response_types" datastore:"response_types"`
+	TokenEndpointAuthMethod string   `json:"token_endpoint_auth_method" datastore:"token_endpoint_auth_method"`
+	Scope                   string   `json:"scope,omitempty" datastore:"scope"`
+	OrgId                   string   `json:"org_id,omitempty" datastore:"org_id"`
+	UserId                  string   `json:"user_id,omitempty" datastore:"user_id"`
+	CreatedAt               int64    `json:"created_at" datastore:"created_at"`
+	IsDynamic               bool     `json:"is_dynamic" datastore:"is_dynamic"`
+}
+
+type OAuthClientWrapper struct {
+	Index       string      `json:"_index"`
+	Type        string      `json:"_type"`
+	ID          string      `json:"_id"`
+	Version     int         `json:"_version"`
+	SeqNo       int         `json:"_seq_no"`
+	PrimaryTerm int         `json:"_primary_term"`
+	Found       bool        `json:"found"`
+	Source      OAuthClient `json:"_source"`
+}
+
+type OAuthToken struct {
+	ID           string    `json:"id" datastore:"id"`
+	AccessToken  string    `json:"access_token" datastore:"access_token"`
+	RefreshToken string    `json:"refresh_token,omitempty" datastore:"refresh_token"`
+	TokenType    string    `json:"token_type" datastore:"token_type"`
+	Scope        string    `json:"scope" datastore:"scope"`
+	AllowedApps  []string  `json:"allowed_apps,omitempty" datastore:"allowed_apps,omitempty"`
+	ExpiresIn    int64     `json:"expires_in" datastore:"expires_in"`
+	ExpiresAt    time.Time `json:"expires_at" datastore:"expires_at"`
+	ClientID     string    `json:"client_id" datastore:"client_id"`
+	OrgId        string    `json:"org_id" datastore:"org_id"`
+	UserId       string    `json:"user_id" datastore:"user_id"`
+	CreatedAt    int64     `json:"created_at" datastore:"created_at"`
+}
+
+type OAuthTokenWrapper struct {
+	Index       string     `json:"_index"`
+	Type        string     `json:"_type"`
+	ID          string     `json:"_id"`
+	Version     int        `json:"_version"`
+	SeqNo       int        `json:"_seq_no"`
+	PrimaryTerm int        `json:"_primary_term"`
+	Found       bool       `json:"found"`
+	Source      OAuthToken `json:"_source"`
+}
+
+type OAuthAuthCode struct {
+	ID                  string    `json:"id" datastore:"id"`
+	Code                string    `json:"code" datastore:"code"`
+	ClientID            string    `json:"client_id" datastore:"client_id"`
+	RedirectURI         string    `json:"redirect_uri" datastore:"redirect_uri"`
+	CodeChallenge       string    `json:"code_challenge" datastore:"code_challenge"`
+	CodeChallengeMethod string    `json:"code_challenge_method" datastore:"code_challenge_method"`
+	Scope               string    `json:"scope" datastore:"scope"`
+	AllowedApps         []string  `json:"allowed_apps,omitempty" datastore:"allowed_apps,omitempty"`
+	OrgId               string    `json:"org_id" datastore:"org_id"`
+	UserId              string    `json:"user_id" datastore:"user_id"`
+	ExpiresAt           time.Time `json:"expires_at" datastore:"expires_at"`
+	Used                bool      `json:"used" datastore:"used"`
+	CreatedAt           int64     `json:"created_at" datastore:"created_at"`
+}
+
+type OAuthAuthCodeWrapper struct {
+	Index       string        `json:"_index"`
+	Type        string        `json:"_type"`
+	ID          string        `json:"_id"`
+	Version     int           `json:"_version"`
+	SeqNo       int           `json:"_seq_no"`
+	PrimaryTerm int           `json:"_primary_term"`
+	Found       bool          `json:"found"`
+	Source      OAuthAuthCode `json:"_source"`
+}
+
+// OAuthScopeInfo represents metadata for an OAuth scope to render user-friendly consent prompts.
+type OAuthScopeInfo struct {
+	Scope       string `json:"scope"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	Category    string `json:"category,omitempty"`
+}
+
+// OAuthUserInfo provides lightweight user identity details for the consent window.
+type OAuthUserInfo struct {
+	ID       string `json:"id"`
+	Username string `json:"username"`
+	Name     string `json:"name,omitempty"`
+}
+
+// OAuthConsentInfoResponse is returned by GET /api/v1/oauth2/authorize to render the consent UI.
+type OAuthConsentInfoResponse struct {
+	ClientID      string           `json:"client_id"`
+	ClientName    string           `json:"client_name"`
+	Scopes        []OAuthScopeInfo `json:"scopes"`
+	User          OAuthUserInfo    `json:"user"`
+	AvailableOrgs []OrgMini        `json:"available_orgs"`
+	SelectedOrgId string           `json:"selected_org_id"`
+	RedirectURI   string           `json:"redirect_uri"`
+	State         string           `json:"state"`
+}
+
+// OAuthAuthorizeRequest represents the decision sent by the consent UI or client to POST /oauth2/authorize.
+type OAuthAuthorizeRequest struct {
+	ClientID            string   `json:"client_id"`
+	RedirectURI         string   `json:"redirect_uri"`
+	ResponseType        string   `json:"response_type"`
+	Scope               string   `json:"scope"`
+	AllowedApps         []string `json:"allowed_apps,omitempty"`
+	State               string   `json:"state"`
+	CodeChallenge       string   `json:"code_challenge"`
+	CodeChallengeMethod string   `json:"code_challenge_method"`
+	OrgId               string   `json:"org_id"`
+	Approved            bool     `json:"approved"`
+}
+
+// OAuthAuthorizeResponse is returned after consent is granted/denied.
+type OAuthAuthorizeResponse struct {
+	RedirectURL string `json:"redirect_url"`
+	Code        string `json:"code,omitempty"`
+	State       string `json:"state,omitempty"`
+}
+
+// OAuthTokenRequest represents incoming parameters to POST /oauth2/token
+type OAuthTokenRequest struct {
+	GrantType    string `json:"grant_type"`
+	Code         string `json:"code"`
+	RedirectURI  string `json:"redirect_uri"`
+	ClientID     string `json:"client_id"`
+	ClientSecret string `json:"client_secret,omitempty"`
+	CodeVerifier string `json:"code_verifier"`
+	RefreshToken string `json:"refresh_token,omitempty"`
+	Scope        string `json:"scope,omitempty"`
+}
+
+// OAuthTokenResponse represents the RFC 6749 standard JSON response for POST /oauth2/token
+type OAuthTokenResponse struct {
+	AccessToken  string `json:"access_token"`
+	TokenType    string `json:"token_type"`
+	ExpiresIn    int64  `json:"expires_in"`
+	RefreshToken string `json:"refresh_token,omitempty"`
+	Scope        string `json:"scope,omitempty"`
+}
+
+// OAuthRevokeRequest represents the RFC 7009 token revocation request
+type OAuthRevokeRequest struct {
+	Token         string `json:"token"`
+	TokenTypeHint string `json:"token_type_hint,omitempty"`
+	ClientID      string `json:"client_id,omitempty"`
+	ClientSecret  string `json:"client_secret,omitempty"`
+}
+
+// OAuthTokenView represents a safe view of an active OAuth token for the frontend UI
+type OAuthTokenView struct {
+	ID          string    `json:"id"`
+	ClientID    string    `json:"client_id"`
+	ClientName  string    `json:"client_name,omitempty"`
+	TokenType   string    `json:"token_type"`
+	Scope       string    `json:"scope"`
+	AllowedApps []string  `json:"allowed_apps,omitempty"`
+	OrgId       string    `json:"org_id"`
+	UserId      string    `json:"user_id"`
+	CreatedAt   int64     `json:"created_at"`
+	ExpiresAt   time.Time `json:"expires_at"`
+	TokenMasked string    `json:"token_masked"`
+}
+
+
+type DisabledHookWrapper struct {
+	Index       string        `json:"_index"`
+	Type        string        `json:"_type"`
+	ID          string        `json:"_id"`
+	Version     int           `json:"_version"`
+	SeqNo       int           `json:"_seq_no"`
+	PrimaryTerm int           `json:"_primary_term"`
+	Found       bool          `json:"found"`
+	Source      DisabledRules `json:"_source"`
+}
+
+type SelectedRulesWrapper struct {
+	Index       string                 `json:"_index"`
+	Type        string                 `json:"_type"`
+	ID          string                 `json:"_id"`
+	Version     int                    `json:"_version"`
+	SeqNo       int                    `json:"_seq_no"`
+	PrimaryTerm int                    `json:"_primary_term"`
+	Found       bool                   `json:"found"`
+	Source      SelectedDetectionRules `json:"_source"`
+}
+
+type HookWrapper struct {
+	Index       string `json:"_index"`
+	Type        string `json:"_type"`
+	ID          string `json:"_id"`
+	Version     int    `json:"_version"`
+	SeqNo       int    `json:"_seq_no"`
+	PrimaryTerm int    `json:"_primary_term"`
+	Found       bool   `json:"found"`
+	Source      Hook   `json:"_source"`
+}
+
+type AllHooksWrapper struct {
+	Hits struct {
+		Total struct {
+			Value    int    `json:"value"`
+			Relation string `json:"relation"`
+		} `json:"total"`
+		Hits []struct {
+			Index  string  `json:"_index"`
+			ID     string  `json:"_id"`
+			Score  float64 `json:"_score"`
+			Source Hook    `json:"_source"`
+		} `json:"hits"`
+	} `json:"hits"`
+}
+
+type ScheduleWrapper struct {
+	Index       string      `json:"_index"`
+	Type        string      `json:"_type"`
+	ID          string      `json:"_id"`
+	Version     int         `json:"_version"`
+	SeqNo       int         `json:"_seq_no"`
+	PrimaryTerm int         `json:"_primary_term"`
+	Found       bool        `json:"found"`
+	Source      ScheduleOld `json:"_source"`
+}
+
+type ParsedApiWrapper struct {
+	Index       string        `json:"_index"`
+	Type        string        `json:"_type"`
+	ID          string        `json:"_id"`
+	Version     int           `json:"_version"`
+	SeqNo       int           `json:"_seq_no"`
+	PrimaryTerm int           `json:"_primary_term"`
+	Found       bool          `json:"found"`
+	Source      ParsedOpenApi `json:"_source"`
+}
+
+type ExecRequestWrapper struct {
+	Index       string           `json:"_index"`
+	Type        string           `json:"_type"`
+	ID          string           `json:"_id"`
+	Version     int              `json:"_version"`
+	SeqNo       int              `json:"_seq_no"`
+	PrimaryTerm int              `json:"_primary_term"`
+	Found       bool             `json:"found"`
+	Source      ExecutionRequest `json:"_source"`
+}
+
+type UserWrapper struct {
+	Index       string `json:"_index"`
+	Type        string `json:"_type"`
+	ID          string `json:"_id"`
+	Version     int    `json:"_version"`
+	SeqNo       int    `json:"_seq_no"`
+	PrimaryTerm int    `json:"_primary_term"`
+	Found       bool   `json:"found"`
+	Source      User   `json:"_source"`
+}
+
+type DatastoreCategoryKeyWrapper struct {
+	Index       string                  `json:"_index"`
+	Type        string                  `json:"_type"`
+	ID          string                  `json:"_id"`
+	Version     int                     `json:"_version"`
+	SeqNo       int                     `json:"_seq_no"`
+	PrimaryTerm int                     `json:"_primary_term"`
+	Found       bool                    `json:"found"`
+	Source      DatastoreCategoryUpdate `json:"_source"`
+}
+
+type CacheKeyWrapper struct {
+	Index       string       `json:"_index"`
+	Type        string       `json:"_type"`
+	ID          string       `json:"_id"`
+	Version     int          `json:"_version"`
+	SeqNo       int          `json:"_seq_no"`
+	PrimaryTerm int          `json:"_primary_term"`
+	Found       bool         `json:"found"`
+	Source      CacheKeyData `json:"_source"`
+}
+
+type GithubAuthor struct {
+	Name     string `json:"name"`
+	Url      string `json:"url"`
+	ImageUrl string `json:"image"`
+}
+
+type GithubResp struct {
+	Name          string         `json:"name"`
+	Contributors  []GithubAuthor `json:"contributors"`
+	PublishedDate int64          `json:"published_date"`
+	Edited        string         `json:"edited"`
+	ReadTime      int            `json:"read_time"`
+	Link          string         `json:"link"`
+}
+
+type FileList struct {
+	Success bool         `json:"success"`
+	Reason  string       `json:"reason"`
+	List    []GithubResp `json:"list"`
+}
+
+type SessionCookie struct {
+	Key        string `json:"key"`
+	Value      string `json:"value"`
+	Expiration int64  `json:"expiration"`
+}
+
+type Tutorial struct {
+	Name        string `json:"name" datastore:"name"`
+	Description string `json:"description" datastore:"description"`
+	Link        string `json:"link" datastore:"link"`
+	Done        bool   `json:"done" datastore:"done"`
+	Active      bool   `json:"active" datastore:"active"`
+}
+
+type HandleInfo struct {
+	Success              bool            `json:"success"`
+	Admin                string          `json:"admin"`
+	Username             string          `json:"username"`
+	PublicUsername       string          `json:"public_username"`
+	Name                 string          `json:"name"`
+	ActiveApps           []string        `json:"active_apps"`
+	Id                   string          `json:"id"`
+	Avatar               string          `json:"avatar"`
+	Orgs                 []OrgMini       `json:"orgs"`
+	ActiveOrg            OrgMini         `json:"active_org"`
+	EthInfo              EthInfo         `json:"eth_info,omitempty"`
+	ChatDisabled         bool            `json:"chat_disabled"`
+	Interests            []Priority      `json:"interests"`
+	Priorities           []Priority      `json:"priorities"`
+	Cookies              []SessionCookie `json:"cookies"`
+	AppExecutionsLimit   int64           `json:"app_execution_limit"`
+	AppExecutionsSuborgs int64           `json:"app_executions_suborgs"`
+	AppExecutionsUsage   int64           `json:"app_execution_usage"`
+	RegionUrl            string          `json:"region_url"`
+	Support              bool            `json:"support"`
+	Tutorials            []Tutorial      `json:"tutorials"`
+	OrgStatus            []string        `json:"org_status"`
+
+	HasCardAvailable    bool        `json:"has_card_available,omitempty"`
+	ActivatedPayasyougo bool        `json:"activated_pay_as_you_go,omitempty"`
+	Licensed            bool        `json:"licensed"`
+	UserGeoInfo         UserGeoInfo `json:"user_geo_info,omitempty"`
+	Theme               string      `json:"theme"`
+	AIEnabled           bool        `json:"ai_enabled"`
+	SSOInfos            []SSOInfo   `json:"sso_infos"`
+}
+
+//Cookies      []SessionCookie `json:"session_cookie"`
+
+type BuildLaterStruct struct {
+	Tags  []string
+	Extra string
+	Id    string
+}
+
+// Overwriting results fo a subflow trigger
+type SubflowData struct {
+	Success       bool   `json:"success"`
+	ExecutionId   string `json:"execution_id,omitempty"`
+	Authorization string `json:"authorization,omitempty"`
+	Result        string `json:"result"`
+	ResultSet     bool   `json:"result_set,omitempty"`
+}
+
+// AuthenticationStore with oauth2
+type Oauth2Resp struct {
+	AccessToken  string `json:"access_token" url:"access_token,omitempty"`
+	RefreshToken string `json:"refresh_token" url:"refresh_token,omitempty"`
+	TokenType    string `json:"token_type" url:"token_type,omitempty"`
+	Scope        string `json:"scope" url:"scope,omitempty"`
+	ExpiresIn    int    `json:"expires_in" url:"expires_in,omitempty"`
+	ExtExpiresIn int    `json:"ext_expires_in" url:"ext_expires_in,omitempty"`
+}
+
+type OpenidUserinfo struct {
+	Sub   string   `json:"sub"`
+	Email string   `json:"email"`
+	Roles []string `json:"roles"`
+	// EmailVerified bool     `json:"email_verified"`
+	// Groups        []string `json:"groups"`
+	// RealmAccess   struct {
+	// 	Roles []string `json:"roles"`
+	// } `json:"realm_access"` // Keycloak format
+}
+
+type OpenidResp struct {
+	AccessToken  string `json:"access_token"`
+	IdToken      string `json:"id_token"`
+	Scope        string `json:"scope"`
+	TokenType    string `json:"token_type"`
+	ExpiresIn    int    `json:"expires_in"`
+	ExtExpiresIn int    `json:"ext_expires_in"`
+}
+
+type AuthorizationCode struct {
+	AuthorizationUrl string   `json:"authorizationUrl"`
+	RefreshUrl       string   `json:"refreshUrl"`
+	Scopes           []string `json:"scopes"`
+	TokenUrl         string   `json:"tokenUrl"`
+}
+
+type Oauth2Openapi struct {
+	AuthorizationCode AuthorizationCode `json:"authorizationCode"`
+}
+
+// The data to be parsed
+type DataToSend struct {
+	Code         string `json:"code"  datastore:"code" url:"code,omitempty"`
+	GrantType    string `json:"grant_type"  datastore:"grant_type" url:"grant_type,omitempty"`
+	ClientSecret string `json:"client_secret"  datastore:"client_secret" url:"client_secret,omitempty"`
+	ClientId     string `json:"client_id"  datastore:"client_id" url:"client_id,omitempty"`
+	Scope        string `json:"scope"  datastore:"scope" url:"scope,omitempty"`
+	RedirectUri  string `json:"redirect_uri" datastore:"id" url:"redirect_uri,omitempty"`
+	Name         string `json:"name,omitempty"  datastore:"name" url:"name,omitempty"`
+	Id           string `json:"id,omitempty" datastore:"id" url:"id,omitempty"`
+	Resource     string `json:"resource,omitempty" datastore:"resource" url:"resource,omitempty"`
+}
+
+type BaseFile struct {
+	Name               string   `json:"name"`
+	ID                 string   `json:"id"`
+	Type               string   `json:"type"`
+	UpdatedAt          int64    `json:"updated_at"`
+	Md5Sum             string   `json:"md5_sum"`
+	Status             string   `json:"status"`
+	FileSize           int64    `json:"filesize"`
+	OrgId              string   `json:"org_id"`
+	SuborgDistribution []string `json:"suborg_distribution"`
+	Tags               []string `json:"tags,omitempty" datastore:"tags"`
+}
+
+type FileResponse struct {
+	Success    bool       `json:"success" datastore:"success"`
+	Files      []File     `json:"files,omitempty" datastore:"files"`
+	Namespaces []string   `json:"namespaces,omitempty" datastore:"namespaces"`
+	List       []BaseFile `json:"list,omitempty" datastore:"list"`
+}
+
+type SSOConfig struct {
+	SSOEntrypoint      string `json:"sso_entrypoint" datastore:"sso_entrypoint"`
+	SSOCertificate     string `json:"sso_certificate" datastore:"sso_certificate"`
+	SSOLongCertificate string `json:"sso_long_certificate" datastore:"sso_long_certificate,noindex"`
+	SSOCertificateHash string `json:"sso_certificate_hash" datastore:"sso_certificate_hash"`
+
+	OpenIdClientId      string `json:"client_id" datastore:"client_id"`
+	OpenIdClientSecret  string `json:"client_secret" datastore:"client_secret"`
+	OpenIdAuthorization string `json:"openid_authorization" datastore:"openid_authorization"`
+	OpenIdToken         string `json:"openid_token" datastore:"openid_token"`
+
+	SSORequired bool `json:"SSORequired" datastore:"SSORequired"`
+	// i have a distinct hatered for this name.
+	// says "auto_provision" but all logic treats it as disable_auto_provision.
+	AutoProvision    bool `json:"auto_provision" datastore:"auto_provision"`
+	RoleRequired     bool `json:"role_required" datastore:"role_required"`
+	SkipSSOForAdmins bool `json:"skip_sso_for_admins" datastore:"skip_sso_for_admins"`
+}
+
+type SamlRequest struct {
+	XMLName                     xml.Name `xml:"AuthnRequest"`
+	Text                        string   `xml:",chardata"`
+	Samlp                       string   `xml:"samlp,attr"`
+	Xmlns                       string   `xml:"xmlns,attr"`
+	Saml                        string   `xml:"saml,attr"`
+	AssertionConsumerServiceURL string   `xml:"AssertionConsumerServiceURL,attr"`
+	Destination                 string   `xml:"Destination,attr"`
+	ForceAuthn                  string   `xml:"ForceAuthn,attr"`
+	ID                          string   `xml:"ID,attr"`
+	IssueInstant                string   `xml:"IssueInstant,attr"`
+	ProtocolBinding             string   `xml:"ProtocolBinding,attr"`
+	Version                     string   `xml:"Version,attr"`
+	Issuer                      string   `xml:"Issuer"`
+	NameIDPolicy                struct {
+		Text        string `xml:",chardata"`
+		AllowCreate string `xml:"AllowCreate,attr"`
+		Format      string `xml:"Format,attr"`
+	} `xml:"NameIDPolicy"`
+}
+
+type SAMLResponse struct {
+	XMLName      xml.Name `xml:"Response"`
+	Text         string   `xml:",chardata"`
+	Destination  string   `xml:"Destination,attr"`
+	ID           string   `xml:"ID,attr"`
+	IssueInstant string   `xml:"IssueInstant,attr"`
+	Version      string   `xml:"Version,attr"`
+	Saml2p       string   `xml:"saml2p,attr"`
+	Issuer       struct {
+		Text   string `xml:",chardata"`
+		Format string `xml:"Format,attr"`
+		Saml2  string `xml:"saml2,attr"`
+	} `xml:"Issuer"`
+	Signature struct {
+		Text       string `xml:",chardata"`
+		Ds         string `xml:"ds,attr"`
+		SignedInfo struct {
+			Text                   string `xml:",chardata"`
+			CanonicalizationMethod struct {
+				Text      string `xml:",chardata"`
+				Algorithm string `xml:"Algorithm,attr"`
+			} `xml:"CanonicalizationMethod"`
+			SignatureMethod struct {
+				Text      string `xml:",chardata"`
+				Algorithm string `xml:"Algorithm,attr"`
+			} `xml:"SignatureMethod"`
+			Reference struct {
+				Text       string `xml:",chardata"`
+				URI        string `xml:"URI,attr"`
+				Transforms struct {
+					Text      string `xml:",chardata"`
+					Transform []struct {
+						Text      string `xml:",chardata"`
+						Algorithm string `xml:"Algorithm,attr"`
+					} `xml:"Transform"`
+				} `xml:"Transforms"`
+				DigestMethod struct {
+					Text      string `xml:",chardata"`
+					Algorithm string `xml:"Algorithm,attr"`
+				} `xml:"DigestMethod"`
+				DigestValue string `xml:"DigestValue"`
+			} `xml:"Reference"`
+		} `xml:"SignedInfo"`
+		SignatureValue string `xml:"SignatureValue"`
+		KeyInfo        struct {
+			Text     string `xml:",chardata"`
+			X509Data struct {
+				Text            string `xml:",chardata"`
+				X509Certificate string `xml:"X509Certificate"`
+			} `xml:"X509Data"`
+		} `xml:"KeyInfo"`
+	} `xml:"Signature"`
+	Status struct {
+		Text       string `xml:",chardata"`
+		Saml2p     string `xml:"saml2p,attr"`
+		StatusCode struct {
+			Text  string `xml:",chardata"`
+			Value string `xml:"Value,attr"`
+		} `xml:"StatusCode"`
+	} `xml:"Status"`
+	Assertion struct {
+		Text         string `xml:",chardata"`
+		ID           string `xml:"ID,attr"`
+		IssueInstant string `xml:"IssueInstant,attr"`
+		Version      string `xml:"Version,attr"`
+		Saml2        string `xml:"saml2,attr"`
+		Issuer       struct {
+			Text   string `xml:",chardata"`
+			Format string `xml:"Format,attr"`
+			Saml2  string `xml:"saml2,attr"`
+		} `xml:"Issuer"`
+		Signature struct {
+			Text       string `xml:",chardata"`
+			Ds         string `xml:"ds,attr"`
+			SignedInfo struct {
+				Text                   string `xml:",chardata"`
+				CanonicalizationMethod struct {
+					Text      string `xml:",chardata"`
+					Algorithm string `xml:"Algorithm,attr"`
+				} `xml:"CanonicalizationMethod"`
+				SignatureMethod struct {
+					Text      string `xml:",chardata"`
+					Algorithm string `xml:"Algorithm,attr"`
+				} `xml:"SignatureMethod"`
+				Reference struct {
+					Text       string `xml:",chardata"`
+					URI        string `xml:"URI,attr"`
+					Transforms struct {
+						Text      string `xml:",chardata"`
+						Transform []struct {
+							Text      string `xml:",chardata"`
+							Algorithm string `xml:"Algorithm,attr"`
+						} `xml:"Transform"`
+					} `xml:"Transforms"`
+					DigestMethod struct {
+						Text      string `xml:",chardata"`
+						Algorithm string `xml:"Algorithm,attr"`
+					} `xml:"DigestMethod"`
+					DigestValue string `xml:"DigestValue"`
+				} `xml:"Reference"`
+			} `xml:"SignedInfo"`
+			SignatureValue string `xml:"SignatureValue"`
+			KeyInfo        struct {
+				Text     string `xml:",chardata"`
+				X509Data struct {
+					Text            string `xml:",chardata"`
+					X509Certificate string `xml:"X509Certificate"`
+				} `xml:"X509Data"`
+			} `xml:"KeyInfo"`
+		} `xml:"Signature"`
+		Subject struct {
+			Text   string `xml:",chardata"`
+			Saml2  string `xml:"saml2,attr"`
+			NameID struct {
+				Text   string `xml:",chardata"`
+				Format string `xml:"Format,attr"`
+			} `xml:"NameID"`
+			SubjectConfirmation struct {
+				Text                    string `xml:",chardata"`
+				Method                  string `xml:"Method,attr"`
+				SubjectConfirmationData struct {
+					Text         string `xml:",chardata"`
+					NotOnOrAfter string `xml:"NotOnOrAfter,attr"`
+					Recipient    string `xml:"Recipient,attr"`
+				} `xml:"SubjectConfirmationData"`
+			} `xml:"SubjectConfirmation"`
+		} `xml:"Subject"`
+		Conditions struct {
+			Text                string `xml:",chardata"`
+			NotBefore           string `xml:"NotBefore,attr"`
+			NotOnOrAfter        string `xml:"NotOnOrAfter,attr"`
+			Saml2               string `xml:"saml2,attr"`
+			AudienceRestriction struct {
+				Text     string `xml:",chardata"`
+				Audience string `xml:"Audience"`
+			} `xml:"AudienceRestriction"`
+		} `xml:"Conditions"`
+		AuthnStatement struct {
+			Text         string `xml:",chardata"`
+			AuthnInstant string `xml:"AuthnInstant,attr"`
+			SessionIndex string `xml:"SessionIndex,attr"`
+			Saml2        string `xml:"saml2,attr"`
+			AuthnContext struct {
+				Text                 string `xml:",chardata"`
+				AuthnContextClassRef string `xml:"AuthnContextClassRef"`
+			} `xml:"AuthnContext"`
+		} `xml:"AuthnStatement"`
+	} `xml:"Assertion"`
+}
+
+type WrappedData struct {
+	Data        string `json:"data"`
+	MessageId   string `json:"message_id"`
+	PublishTime string `json:"publish_time"`
+}
+
+type Inputdata struct {
+	Message      WrappedData `json:"message"`
+	Subscription string      `json:"subscription"`
+}
+
+type ParsedMessage struct {
+	EmailAddress string `json:"emailAddress"`
+	HistoryId    int    `json:"historyId"`
+	MessageId    string `json:"messageId"`
+}
+
+type NotificationResponse struct {
+	Success       bool           `json:"success"`
+	Notifications []Notification `json:"notifications"`
+}
+
+type GmailMessagesStruct struct {
+	Messages []struct {
+		ID       string `json:"id"`
+		ThreadID string `json:"threadId"`
+	} `json:"messages"`
+	NextPageToken      string `json:"nextPageToken"`
+	ResultSizeEstimate int    `json:"resultSizeEstimate"`
+}
+
+type MessageAddedMessage struct {
+	ID       string   `json:"id"`
+	ThreadID string   `json:"threadId"`
+	LabelIds []string `json:"labelIds"`
+}
+
+type MessageAdded struct {
+	Message MessageAddedMessage `json:"message"`
+}
+
+type GmailHistoryStruct struct {
+	History []struct {
+		ID       string `json:"id"`
+		Messages []struct {
+			ID       string `json:"id"`
+			ThreadID string `json:"threadId"`
+		} `json:"messages"`
+		MessagesDeleted []struct {
+			Message struct {
+				ID       string   `json:"id"`
+				ThreadID string   `json:"threadId"`
+				LabelIds []string `json:"labelIds"`
+			} `json:"message"`
+		} `json:"messagesDeleted,omitempty"`
+		MessagesAdded []MessageAdded `json:"messagesAdded,omitempty"`
+	} `json:"history"`
+	HistoryID string `json:"historyId"`
+}
+
+type GmailThreadStruct struct {
+	ID        string               `json:"id"`
+	HistoryID string               `json:"historyId"`
+	Messages  []GmailMessageStruct `json:"messages"`
+}
+
+type GmailMessageStruct struct {
+	ID       string   `json:"id"`
+	ThreadID string   `json:"threadId"`
+	LabelIds []string `json:"labelIds"`
+	Snippet  string   `json:"snippet"`
+	Payload  struct {
+		PartID       string `json:"partId"`
+		MessageID    string `json:"message_id"`
+		MimeType     string `json:"mimeType"`
+		Filename     string `json:"filename"`
+		FileMimeType string `json:"file_mimetype"`
+		Sender       string `json:"sender"`
+		Subject      string `json:"subject"`
+		Recipient    string `json:"recipient"`
+		ParsedBody   string `json:"parsed_body"`
+		Headers      []struct {
+			Name  string `json:"name"`
+			Value string `json:"value"`
+		} `json:"headers"`
+		Body struct {
+			Size int `json:"size"`
+		} `json:"body"`
+		Parts []struct {
+			PartID   string `json:"partId"`
+			MimeType string `json:"mimeType"`
+			Filename string `json:"filename"`
+			Headers  []struct {
+				Name  string `json:"name"`
+				Value string `json:"value"`
+			} `json:"headers"`
+			Body struct {
+				AttachmentID string `json:"attachmentId"`
+				Size         int    `json:"size"`
+				Data         string `json:"data"`
+			} `json:"body"`
+		} `json:"parts"`
+	} `json:"payload"`
+	SizeEstimate int      `json:"sizeEstimate"`
+	HistoryID    string   `json:"historyId"`
+	InternalDate string   `json:"internalDate"`
+	FileIds      []string `json:"file_ids"`
+	Type         string   `json:"type"`
+}
+
+type GmailAttachment struct {
+	Size int    `json:"size"`
+	Data string `json:"data"`
+}
+
+type ExecInfo struct {
+	OnpremExecution bool
+	CloudExec       bool
+	Environments    []string
+	ImageNames      []string
+}
+
+type ResultChecker struct {
+	Success bool   `json:"success"`
+	Reason  string `json:"reason"`
+	Extra   string `json:"extra,omitempty"`
+}
+
+type Metadata struct {
+	ID            string    `description:"Message ID" json:"id" format:"uuid4" validate:"required,uuid4"`
+	CanonicalID   string    `description:"An ID that can be used to group similar messages/campaigns together" json:"canonical_id" validate:"required"`
+	CreatedAt     time.Time `description:"Creation time of the data model" json:"created_at" format:"date-time" validate:"required"`
+	SchemaVersion string    `description:"Schema version number" json:"schema_version" validate:"required"`
+}
+
+type MessageDataModel struct {
+	Attachments []Attachment        `description:"Attachments" json:"attachments,omitempty" validate:"omitempty"`
+	Body        *Body               `description:"Body of the email" json:"body,omitempty" validate:"omitempty"`
+	External    *External           `description:"Cloud API provider or other external source metadata" json:"external,omitempty" validate:"omitempty"`
+	Headers     Headers             `description:"The message headers" json:"headers" validate:"required"`
+	Type        MessageType         `description:"The types of the message from the perspective of the message source" json:"type" validate:"required"`
+	Mailbox     *Mailbox            `description:"The mailbox we retrieved the message from" json:"mailbox,omitempty" validate:"omitempty"`
+	Recipients  Recipients          `description:"Recipient objects" json:"recipients" validate:"required"`
+	Sender      Mailbox             `description:"Sender object" json:"sender" validate:"required"`
+	Subject     *Subject            `description:"Subject object" json:"subject,omitempty" validate:"omitempty"`
+	Meta        Metadata            `description:"Metadata" json:"_meta" validate:"required"`
+	Errors      []map[string]string `description:"Non-fatal errors while parsing MDM" json:"_errors,omitempty"`
+}
+
+type Attachment struct {
+	ContentTransferEncoding string  `description:"Content-Transfer-Encoding extracted from the MIME payload" json:"content_transfer_encoding,omitempty" validate:"omitempty"`
+	ContentType             string  `description:"Content-Type extracted from the MIME payload" json:"content_type,omitempty" validate:"omitempty"`
+	FileExtension           string  `description:"File extension" json:"file_extension,omitempty" validate:"omitempty,isdefault"`
+	FileName                string  `description:"File name" json:"file_name,omitempty" validate:"omitempty"`
+	FileType                string  `description:"File type (determined by looking at the magic bytes in the file)" json:"file_type,omitempty" validate:"omitempty,isdefault"`
+	Size                    *int64  `description:"Size of the attachment in bytes" json:"size,omitempty" validate:"omitempty,isdefault"`
+	Raw                     *string `description:"Base64 encoded source of the attachment" json:"raw,omitempty" validate:"omitempty"`
+}
+
+type Body struct {
+	HTML  *BodyText `description:"The body part containing content-type text/html" json:"html,omitempty" validate:"omitempty"`
+	Plain *BodyText `description:"The body part containing content-type text/plain" json:"plain,omitempty" validate:"omitempty"`
+	IPs   []IP      `description:"IP Addresses located in the body" json:"ips,omitempty" validate:"omitempty"`
+	Links []Link    `description:"All links (including standalone URLs) found in the body of the message" json:"links,omitempty" validate:"omitempty"`
+}
+
+type BodyText struct {
+	Raw                     *string `description:"Decoded raw content of a body text type (text/[subtype] section)" json:"raw,omitempty" validate:"omitempty"`
+	Charset                 string  `description:"charset of the text/[subtype]" json:"charset,omitempty" validate:"omitempty"`
+	ContentTransferEncoding string  `description:"Content-Transfer-Encoding of the text/[subtype]" json:"content_transfer_encoding,omitempty" validate:"omitempty"`
+}
+
+type Domain struct {
+	Domain     string `description:"The fully qualified domain name (FQDN). This may not *always* be routable, e.g. when an email address contains a domain that is just a TLD with no SLD, e.g. foo@WIN-bar" json:"domain" validate:"required"`
+	RootDomain string `description:"The root domain, including the TLD" json:"root_domain,omitempty" validate:"omitempty"`
+	Sld        string `description:"Second-level domain, e.g. 'windows' for the domain 'windows.net'" json:"sld,omitempty" validate:"omitempty"`
+	Subdomain  string `description:"Subdomain, e.g. 'drive' for the domain 'drive.google.com'" json:"subdomain,omitempty" validate:"omitempty"`
+	Tld        string `description:"The domain's top-level domain. E.g. the TLD of google.com is 'com'" json:"tld,omitempty" validate:"omitempty"`
+	Valid      bool   `description:"Whether the domain is valid" json:"valid,omitempty" validate:"omitempty"`
+}
+
+type EmailAddress struct {
+	Email     string `description:"Full email address" json:"email" validate:"required"`
+	LocalPart string `description:"Local-part, i.e. before the @" json:"local_part" validate:"required"`
+	Domain    Domain `description:"Domain of the email address" json:"domain,omitempty" validate:"omitempty"`
+}
+
+type External struct {
+	CreatedAt  *time.Time `description:"The created time of the message as provided by the cloud API (G Suite or Office 365) or other external source. This is typically the time the external source received the message" format:"date-time" json:"created_at,omitempty" validate:"omitempty"`
+	MessageID  string     `description:"The message ID as provided by the cloud API (G Suite or Office 365) or other external source" json:"message_id,omitempty" validate:"omitempty"`
+	RouteType  string     `description:"whether the message was sent or" json:"route_type,omitempty" validate:"omitempty" enum:"sent,received"`
+	Spam       *bool      `description:"The upstream mail gateway determined the message to be spam. For cloud API providers, this will be the same as spam_folder. For other implementation methods like transport rules, this will be determined by message header values (e.g. X-SPAM) if supported" json:"spam,omitempty" validate:"omitempty"`
+	SpamFolder *bool      `description:"The message arrived in the user's spam folder. This only applies to cloud APIs (G Suite or Office 365)" json:"spam_folder,omitempty" validate:"omitempty"`
+	ThreadID   string     `description:"The thread/conversation's unique ID as provided by the cloud API (G Suite or Office 365)" json:"thread_id,omitempty" validate:"omitempty"`
+}
+
+type IP struct {
+	IP string `description:"The raw IP" json:"ip" validate:"required"`
+}
+
+type Mailbox struct {
+	DisplayName string       `description:"Display name" json:"display_name,omitempty" validate:"omitempty"`
+	Email       EmailAddress `description:"Email address object" json:"email" validate:"required"`
+}
+
+type MessageType struct {
+	Inbound  bool `description:"Message was sent from someone outside your organization, to *at least one* recipient inside your organization" json:"inbound,omitempty" validate:"omitempty"`
+	Internal bool `description:"Message was sent between two or more participants inside your organization" json:"internal,omitempty" validate:"omitempty"`
+	Outbound bool `description:"Message was sent from someone inside your organization, to *at least one* recipient outside your organization" json:"outbound,omitempty" validate:"omitempty"`
+}
+
+type Recipients struct {
+	Bcc []Mailbox `description:"List of 'bcc' Mailbox objects" json:"bcc,omitempty" validate:"omitempty"`
+	Cc  []Mailbox `description:"List of 'cc' Mailbox objects" json:"cc,omitempty" validate:"omitempty"`
+	To  []Mailbox `description:"List of 'to' Mailbox objects" json:"to,omitempty" validate:"omitempty"`
+}
+
+type Subject struct {
+	Subject string `description:"Subject of the email" json:"subject" validate:"required"`
+}
+
+type Link struct {
+	DisplayText string `description:"The text of a hyperlink, if it's not a URL" json:"display_text,omitempty" validate:"omitempty"`
+	DisplayURL  *URL   `description:"URL the user sees when viewing the message" json:"display_url,omitempty" validate:"omitempty"`
+	HrefURL     *URL   `description:"Target URL in a hyperlink. This differs from the display_url when there is a mismatched URL" json:"href_url,omitempty" validate:"omitempty"`
+	Mismatched  *bool  `description:"Whether the display URL and href URL root domains are mismatched" json:"mismatched,omitempty" validate:"omitempty"`
+}
+
+type URL struct {
+	URL         string  `description:"Full URL" json:"url" validate:"required"`
+	Domain      *Domain `description:"Target domain of URL" json:"domain,omitempty" validate:"omitempty"`
+	Fragment    string  `description:"Fragment identifier; the text following the # in the href_url (also called the anchor tag)" json:"fragment,omitempty" validate:"omitempty"`
+	Password    string  `description:"The password specified before the domain name" json:"password,omitempty" validate:"omitempty"`
+	Path        string  `description:"Everything after the TLD and before the query parameters" json:"path,omitempty" validate:"omitempty"`
+	Port        *int    `description:"The port used for the href_url. If no explicit port is set, the port will be inferred from the protocol" json:"port,omitempty" validate:"omitempty"`
+	QueryParams string  `description:"The query parameters of the href_url" json:"query_params,omitempty" validate:"omitempty"`
+	Scheme      string  `description:"Protocol for the href_url request, e.g. http" json:"scheme,omitempty" validate:"omitempty"`
+	Username    string  `description:"The username specified before the domain name of the href_url" json:"username,omitempty" validate:"omitempty"`
+}
+
+type Headers struct {
+	Date               *time.Time    `description:"Date the email was sent in UTC." json:"date,omitempty" validate:"omitempty"`
+	DateOriginalOffset *string       `description:"UTC timezone offset of the sender" json:"date_original_offset,omitempty" validate:"omitempty"`
+	Domains            []Domain      `description:"All domains found in the Received headers" json:"domains,omitempty" validate:"omitempty"`
+	DeliveredTo        *EmailAddress `description:"Delivered-to header value" json:"delivered_to,omitempty" validate:"omitempty"`
+	IPs                []IP          `description:"All IP addresses found in the Received headers" json:"ips,omitempty" validate:"omitempty"`
+	Mailer             *string       `description:"X-Mailer or User-Agent extracted from headers" json:"mailer,omitempty" validate:"omitempty"`
+	MessageID          *string       `description:"Message-ID extracted from the header" json:"message_id,omitempty" validate:"omitempty"`
+	References         []string      `description:"The Message-IDs of the other messages within this chain" json:"references,omitempty" validate:"omitempty"`
+	ReplyTo            []Mailbox     `description:"Where replies should be delivered to" json:"reply_to,omitempty" validate:"omitempty"`
+	ReturnPath         *EmailAddress `description:"RFC 5321 envelope FROM (SMTP MAIL FROM). This is also where bounces are delivered" json:"return_path,omitempty" validate:"omitempty" `
+	XOriginatingIP     *IP           `description:"X-Originating-IP header, which identifies the originating IP address of the sender client" json:"x_originating_ip,omitempty" validate:"omitempty"`
+	Hops               []Hop         `description:"List of hops the message took from Sender to Recipient" json:"hops" validate:"required"`
+}
+
+type Hop struct {
+	Index       int          `description:"Index indicates the order in which a hop occurred from sender to recipient" json:"index" validate:"required"`
+	AuthResults *AuthResults `description:"Results of authentication. Supported fields include 'Authentication-Results', 'X-Original-Authentication-Results', 'X-MS-Exchange-Authentication-Results', 'X-Agari-Authentication-Results' and 'ARC-Authentication-Results'. Specification details can be found at https://tools.ietf.org/html/rfc8601" json:"authentication_results,omitempty" validate:"omitempty"`
+	Signature   *Signature   `description:"Details of a message signature. Supported fields include 'DKIM-Signature', 'DomainKey-Signature', 'X-Google-DKIM-Signature' and 'ARC-Message-Signature'" json:"signature,omitempty" validate:"omitempty"`
+	SPF         *SPF         `description:"Details of the Sender Policy Framework check. Supported fields include 'Received-SPF' and 'X-Received-SPF'" json:"received_spf,omitempty" validate:"omitempty"`
+	Fields      []HopField   `description:"List of all raw header fields contained within this hop" json:"fields" validate:"required"`
+}
+
+type HopField struct {
+	Name     string `description:"The name of the field" json:"name" validate:"required"`
+	Value    string `description:"The value contained within the field" json:"value" validate:"required"`
+	Position int    `description:"This field's position along the entire list of header fields" json:"position" validate:"required"`
+}
+
+type AuthResults struct {
+	Type         string      `description:"The type of authentication result, derived from the field name" json:"type,omitempty" validate:"omitempty"`
+	Instance     string      `description:"Instance number of this auth result (if ARC)" json:"instance,omitempty" validate:"omitempty"`
+	CompAuth     *CompAuth   `description:"Composite Authentication result, used by Microsoft O365" json:"compauth,omitempty" validate:"omitempty"`
+	DKIM         string      `description:"Verdict of the Domain Keys Identified Mail check" enum:"none,pass,fail,policy,neutral,temperror,permerror" json:"dkim,omitempty" validate:"omitempty"`
+	DKIMDetails  []Signature `description:"List of details of the Domain Keys Identified Mail checks" json:"dkim_details,omitempty" validate:"omitempty"`
+	DMARC        string      `description:"Verdict of the Domain-based Message Authentication, Reporting & Conformance check" json:"dmarc,omitempty" enum:"none,pass,fail,reject,bestguesspass,temperror,permerror" validate:"omitempty"`
+	DMARCDetails *DMARC      `description:"Details of the Domain-based Message Authentication, Reporting & Conformance check" json:"dmarc_details,omitempty" validate:"omitempty"`
+	SPF          string      `description:"Verdict of the Sender Policy Framework" enum:"none,pass,fail,softfail,policy,neutral,temperror,permerror" json:"spf,omitempty" validate:"omitempty"`
+	SPFDetails   *SPF        `description:"Details of the Sender Policy Framework" json:"spf_details,omitempty" validate:"omitempty"`
+	Server       *Domain     `description:"The domain of the verifying mail server" json:"server,omitempty" validate:"omitempty"`
+}
+
+type CompAuth struct {
+	Verdict string `description:"Verdict of the compauth" json:"verdict" validate:"required"`
+	Reason  string `description:"Reason for the verdict" json:"reason" validate:"required"`
+}
+
+type Signature struct {
+	Type      string `description:"The type of signature, derived from the field name" json:"type,omitempty" validate:"omitempty"`
+	Instance  string `description:"Instance number of this signature (if ARC)" json:"instance,omitempty" validate:"omitempty"`
+	Version   string `description:"Version" json:"version,omitempty" validate:"omitempty"`
+	Algorithm string `description:"Signing algorithm" json:"algorithm,omitempty" validate:"omitempty"`
+	Selector  string `description:"Selector" json:"selector,omitempty" validate:"omitempty"`
+	Signature string `description:"Signature of headers and body" json:"signature,omitempty" validate:"omitempty"`
+	BodyHash  string `description:"Body Hash" json:"body_hash,omitempty" validate:"omitempty"`
+	Domain    string `description:"Domain" json:"domain,omitempty" validate:"omitempty"`
+	Headers   string `description:"Header fields signed by the algorithm" json:"headers,omitempty" validate:"omitempty"`
+}
+
+type DMARC struct {
+	Version     *string `description:"DMARC version" json:"version" validate:"omitempty"`
+	Verdict     *string `description:"Verdict of the DMARC" json:"verdict" validate:"omitempty"`
+	Action      *string `description:"Action" json:"action" validate:"omitempty"`
+	Policy      *string `description:"Policy for the organizational domain" json:"policy,omitempty" validate:"omitempty"`
+	SubPolicy   *string `description:"Policy for the subdomain of the organizational domain" json:"sub_policy,omitempty" validate:"omitempty"`
+	Disposition *string `description:"Gmail-applied policy" json:"disposition,omitempty" validate:"omitempty"`
+	From        *Domain `description:"Domain of the server that checked the SPF" json:"from,omitempty" validate:"omitempty"`
+}
+
+type SPF struct {
+	Verdict     *string `description:"Verdict of the SPF" json:"verdict" validate:"omitempty"`
+	Server      *Domain `description:"Domain of the server that checked the SPF" json:"server,omitempty" validate:"omitempty"`
+	ClientIP    *IP     `description:"IP of the client the email originated from" json:"client_ip,omitempty" validate:"omitempty"`
+	Designator  *string `description:"Email or domain of the designating body" json:"designator,omitempty" validate:"omitempty"`
+	Helo        *Domain `description:"Domain of the previous server this message hopped from" json:"helo,omitempty" validate:"omitempty"`
+	Description *string `description:"Verbose description of the SPF verdict" json:"description,omitempty" validate:"omitempty"`
+}
+
+type GeneratedMitre struct {
+	Success bool `json:"success"`
+	Timing  struct {
+		AnalysisTime float64 `json:"analysis_time"`
+		TimeVariant  string  `json:"time_variant"`
+	} `json:"timing"`
+	InputLength       int `json:"input_length"`
+	TacticsChecked    int `json:"tactics_checked"`
+	TechniquesChecked int `json:"techniques_checked"`
+	Tactics           []struct {
+		Code              string  `json:"code"`
+		Confidence        float64 `json:"confidence"`
+		ConfidenceVariant string  `json:"confidence_variant"`
+	} `json:"tactics"`
+	Techniques []struct {
+		Code              string  `json:"code"`
+		Confidence        float64 `json:"confidence"`
+		ConfidenceVariant string  `json:"confidence_variant"`
+	} `json:"techniques"`
+	AnalysisID string `json:"analysis_id"`
+	Reason     string `json:"reason"`
+}
+
+// BaseUrl = Backend URL
+// Url = Worker URL
+type OrborusExecutionRequest struct {
+	ExecutionId           string            `json:"execution_id"`
+	Authorization         string            `json:"authorization"`
+	HTTPProxy             string            `json:"http_proxy"`
+	HTTPSProxy            string            `json:"https_proxy"`
+	BaseUrl               string            `json:"base_url"`
+	Url                   string            `json:"url"`
+	EnvironmentName       string            `json:"environment_name"`
+	Timezone              string            `json:"timezone"`
+	Cleanup               string            `json:"cleanup"`
+	ShufflePassProxyToApp string            `json:"shuffle_pass_proxy_to_app"`
+	Action                Action            `json:"action"`
+	FullExecution         WorkflowExecution `json:"workflow_execution"`
+	WorkerServerUrl       string            `json:"worker_server_url"`
+}
+
+type OpenseaAsset struct {
+	Name              string `json:"name" datastore:"name"`
+	Collection        string `json:"collection" datastore:"collection"`
+	CollectionURL     string `json:"collection_url" datastore:"collection_url"`
+	Image             string `json:"image" datastore:"image"`
+	Asset             string `json:"asset" datastore:"asset"`
+	AssetLink         string `json:"asset_link" datastore:"asset_link"`
+	Polygon           bool   `json:"polygon" datastore:"polygon"`
+	WorkflowReference string `json:"workflow_reference" datastore:"workflow_reference"`
+	Workflow          string `json:"workflow" datastore:"workflow"`
+	Creator           string `json:"creator" datastore:"creator"`
+	OwnerUsername     string `json:"owner_username" datastore:"owner_username"`
+	Owner             string `json:"owner" datastore:"owner"`
+	ID                string `json:"id" datastore:"id"`
+	Created           int64  `json:"created" datastore:"created"`
+	Edited            int64  `json:"edited" datastore:"edited"`
+}
+
+type PrizedrawSubmitter struct {
+	IP             string   `json:"ip"`
+	ID             string   `json:"id"`
+	Username       string   `json:"username"`
+	UserId         string   `json:"user_id""`
+	Email          string   `json:"email"`
+	Firstname      string   `json:"firstname"`
+	Lastname       string   `json:"lastname"`
+	Twitter        string   `json:"twitter"`
+	Address        string   `json:"address"`
+	WinningIds     []string `json:"winning_ids"`
+	PreviousWinner bool     `json:"previous_winner"`
+	Created        int64    `json:"created"`
+	Edited         int64    `json:"edited"`
+}
+
+type GithubProfile struct {
+	Login                   string    `json:"login"`
+	ID                      int       `json:"id"`
+	NodeID                  string    `json:"node_id"`
+	AvatarURL               string    `json:"avatar_url"`
+	GravatarID              string    `json:"gravatar_id"`
+	URL                     string    `json:"url"`
+	HTMLURL                 string    `json:"html_url"`
+	FollowersURL            string    `json:"followers_url"`
+	FollowingURL            string    `json:"following_url"`
+	GistsURL                string    `json:"gists_url"`
+	StarredURL              string    `json:"starred_url"`
+	SubscriptionsURL        string    `json:"subscriptions_url"`
+	OrganizationsURL        string    `json:"organizations_url"`
+	ReposURL                string    `json:"repos_url"`
+	EventsURL               string    `json:"events_url"`
+	ReceivedEventsURL       string    `json:"received_events_url"`
+	Type                    string    `json:"type"`
+	SiteAdmin               bool      `json:"site_admin"`
+	Name                    string    `json:"name"`
+	Company                 string    `json:"company"`
+	Blog                    string    `json:"blog"`
+	Location                string    `json:"location"`
+	Email                   string    `json:"email"`
+	Hireable                bool      `json:"hireable"`
+	Bio                     string    `json:"bio"`
+	TwitterUsername         string    `json:"twitter_username"`
+	PublicRepos             int       `json:"public_repos"`
+	PublicGists             int       `json:"public_gists"`
+	Followers               int       `json:"followers"`
+	Following               int       `json:"following"`
+	CreatedAt               time.Time `json:"created_at"`
+	UpdatedAt               time.Time `json:"updated_at"`
+	PrivateGists            int       `json:"private_gists"`
+	TotalPrivateRepos       int       `json:"total_private_repos"`
+	OwnedPrivateRepos       int       `json:"owned_private_repos"`
+	DiskUsage               int       `json:"disk_usage"`
+	Collaborators           int       `json:"collaborators"`
+	TwoFactorAuthentication bool      `json:"two_factor_authentication"`
+	Plan                    struct {
+		Name          string `json:"name"`
+		Space         int    `json:"space"`
+		PrivateRepos  int    `json:"private_repos"`
+		Collaborators int    `json:"collaborators"`
+	} `json:"plan"`
+	Contributions int64 `json:"contributions"`
+}
+
+type SettingsReturn struct {
+	Success  bool   `json:"success"`
+	Username string `json:"username"`
+	Verified bool   `json:"verified"`
+	Apikey   string `json:"apikey"`
+	Image    string `json:"image"`
+
+	Devices []Device `json:"devices"`
+}
+
+type ExtraButton struct {
+	Name  string `json:"name"`
+	Image string `json:"image"`
+	Link  string `json:"link"`
+	App   string `json:"app"`
+	Type  string `json:"type"`
+}
+
+type Usecase struct {
+	Success     bool   `json:"success"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	LeftText    string `json:"left_text"`
+	RightText   string `json:"right_text"`
+	LeftImage   string `json:"left_image"`
+	RightImage  string `json:"right_image"`
+	Direction   string `json:"direction"`
+	Process     []struct {
+		Source      string `json:"source"`
+		Target      string `json:"target"`
+		Description string `json:"description"`
+		Human       bool   `json:"human"`
+	} `json:"process"`
+	Edited          int64         `json:"edited"`
+	EditedBy        string        `json:"edited_by"`
+	Blogpost        string        `json:"blogpost"`
+	Video           string        `json:"video"`
+	Priority        string        `json:"priority"`
+	WorkflowOutline string        `json:"workflow_outline"`
+	ExtraButtons    []ExtraButton `json:"extra_buttons"`
+}
+
+type CacheKeySearchWrapper struct {
+	Took     int  `json:"took"`
+	TimedOut bool `json:"timed_out"`
+	Shards   struct {
+		Total      int `json:"total"`
+		Successful int `json:"successful"`
+		Skipped    int `json:"skipped"`
+		Failed     int `json:"failed"`
+	} `json:"_shards"`
+	Hits struct {
+		Total struct {
+			Value    int    `json:"value"`
+			Relation string `json:"relation"`
+		} `json:"total"`
+		MaxScore float64 `json:"max_score"`
+		Hits     []struct {
+			Index  string       `json:"_index"`
+			Type   string       `json:"_type"`
+			ID     string       `json:"_id"`
+			Score  float64      `json:"_score"`
+			Source CacheKeyData `json:"_source"`
+		} `json:"hits"`
+	} `json:"hits"`
+}
+
+type OrgDatastoreCategoryWrapper struct {
+	Took     int  `json:"took"`
+	TimedOut bool `json:"timed_out"`
+	Shards   struct {
+		Total      int `json:"total"`
+		Successful int `json:"successful"`
+		Skipped    int `json:"skipped"`
+		Failed     int `json:"failed"`
+	} `json:"_shards"`
+	Hits struct {
+		Total struct {
+			Value    int    `json:"value"`
+			Relation string `json:"relation"`
+		} `json:"total"`
+		MaxScore float64 `json:"max_score"`
+		Hits     []struct {
+			Index  string                  `json:"_index"`
+			Type   string                  `json:"_type"`
+			ID     string                  `json:"_id"`
+			Score  float64                 `json:"_score"`
+			Source DatastoreCategoryUpdate `json:"_source"`
+		} `json:"hits"`
+	} `json:"hits"`
+}
+
+type DealSearchWrapper struct {
+	Took     int  `json:"took"`
+	TimedOut bool `json:"timed_out"`
+	Shards   struct {
+		Total      int `json:"total"`
+		Successful int `json:"successful"`
+		Skipped    int `json:"skipped"`
+		Failed     int `json:"failed"`
+	} `json:"_shards"`
+	Hits struct {
+		Total struct {
+			Value    int    `json:"value"`
+			Relation string `json:"relation"`
+		} `json:"total"`
+		MaxScore float64 `json:"max_score"`
+		Hits     []struct {
+			Index  string       `json:"_index"`
+			Type   string       `json:"_type"`
+			ID     string       `json:"_id"`
+			Score  float64      `json:"_score"`
+			Source ResellerDeal `json:"_source"`
+		} `json:"hits"`
+	} `json:"hits"`
+}
+
+type ResellerDeal struct {
+	ID          string `json:"id" datastore:"id"`
+	Name        string `json:"name" datastore:"name"`
+	Type        string `json:"type" datastore:"type"`
+	Address     string `json:"address" datastore:"address"`
+	Country     string `json:"country" datastore:"country"`
+	Currency    string `json:"currency" datastore:"currency"`
+	Status      string `json:"status" datastore:"status"`
+	Value       string `json:"value" datastore:"value"`
+	Discount    string `json:"discount" datastore:"discount"`
+	ResellerOrg string `json:"reseller_org" datastore:"reseller_org"`
+	Created     int64  `json:"created" datastore:"created"`
+	Edited      int64  `json:"edited" datastore:"edited"`
+}
+
+type UsecaseLinks []struct {
+	Name  string `json:"name"`
+	Color string `json:"color"`
+	List  []struct {
+		Name     string `json:"name" datastore:"name"`
+		Priority int    `json:"priority"`
+		Type     string `json:"type"`
+		Last     string `json:"last"`
+		Items    struct {
+			Name  string `json:"name"`
+			Items struct {
+			} `json:"items"`
+		} `json:"items,omitempty"`
+		Description    string     `json:"description,omitempty" datastore:"description,noindex"`
+		Video          string     `json:"video,omitempty"`
+		Blogpost       string     `json:"blogpost,omitempty"`
+		ReferenceImage string     `json:"reference_image,omitempty"`
+		Matches        []Workflow `json:"matches"`
+		Keywords       []string   `json:"keywords"`
+		KeywordMatches int        `json:"keyword_matches"`
+	} `json:"list"`
+}
+
+type IdTokenCheck struct {
+	Aud   string   `json:"aud"`
+	Iss   string   `json:"iss"`
+	Iat   int      `json:"iat"`
+	Nbf   int      `json:"nbf"`
+	Exp   int      `json:"exp"`
+	Aio   string   `json:"aio"`
+	Nonce string   `json:"nonce"`
+	Rh    string   `json:"rh"`
+	Sub   string   `json:"sub"`
+	Tid   string   `json:"tid"`
+	Uti   string   `json:"uti"`
+	Ver   string   `json:"ver"`
+	Email string   `json:"email"`
+	Org   Org      `json:"org"`
+	Roles []string `json:"roles"`
+}
+
+type WidgetMeta struct {
+	Color string `json:"color" datastore:"color"`
+}
+
+type WidgetPointData struct {
+	Key      string     `json:"key" datastore:"key"`
+	Data     int64      `json:"data" datastore:"data"`
+	MetaData WidgetMeta `json:"metadata" datastore:"metadata"`
+}
+
+type WidgetPoint struct {
+	Key  string            `json:"key"  datastore:"key"`
+	Data []WidgetPointData `json:"data"  datastore:"data"`
+}
+
+type Widget struct {
+	Success    bool          `json:"success"`
+	Id         string        `json:"id"`
+	Title      string        `json:"title"`
+	Dashboard  string        `json:"dashboard"`
+	WidgetType string        `json:"widget_type"`
+	Data       []WidgetPoint `json:"data"`
+}
+
+type Conversionevents struct {
+	Id          string        `json:"id" datastore:"id"`
+	Name        string        `json:"name" datastore:"name"`
+	Type        string        `json:"type" datastore:"type"`
+	Events      []WidgetPoint `json:"events" datastore:"events"`
+	Invalid     bool          `json:"invalid" datastore:"invalid"`
+	Verified    bool          `json:"verified" datastore:"verified"`
+	Orgs        int           `json:"orgs" datastore:"orgs"`
+	Searches    int           `json:"searches" datastore:"searches"`
+	Clicks      int           `json:"clicks" datastore:"clicks"`
+	Conversions int           `json:"conversions" datastore:"conversions"`
+	Forks       int           `json:"forks" datastore:"forks"`
+	EditedForks int           `json:"edited_forks" datastore:"edited_forks"`
+	Success     bool          `json:"success"`
+}
+
+type UsecaseStep struct {
+	WorkflowId string `json:"workflow_id"`
+	AppId      string `json:"app_id"`
+	AppName    string `json:"app_name"`
+	AppVersion string `json:"app_version"`
+	Text       string `json:"text"`
+	Image      string `json:"image"`
+	Type       string `json:"type"`
+	ActionType string `json:"action_type"`
+}
+
+type UsecaseMerge struct {
+	Name           string        `json:"name"`
+	Id             string        `json:"id"`
+	Source         UsecaseStep   `json:"source"`
+	Middle         []UsecaseStep `json:"middle"`
+	Destination    UsecaseStep   `json:"destination"`
+	OrgId          string        `json:"org_id"`
+	Username       string        `json:"username"`
+	UserId         string        `json:"user_id"`
+	Timestamp      int64         `json:"timestamp"`
+	SourcePlatform string        `json:"source_platform"`
+}
+
+type AppStats struct {
+	TotalSearches    int           `json:"total_searches" datastore:"total_searches"`
+	Events           []WidgetPoint `json:"events" datastore:"events"`
+	TotalConversions int           `json:"total_conversions" datastore:"total_conversions"`
+	TotalClicks      int           `json:"total_clicks" datastore:"total_clicks"`
+	AppName          string        `json:"app_name" datastore:"app_name"`
+}
+
+type CreatorStats struct {
+	Creator          string     `json:"creator" datastore:"creator"`
+	Apps             int        `json:"apps" datastore:"apps"`
+	MostClickedApp   string     `json:"most_clicked_app" datastore:"most_clicked_app"`
+	MostConversedApp string     `json:"most_conversed_app" datastore:"most_conversed_app"`
+	Verified         bool       `json:"verified" datastore:"verified"`
+	Workflows        int        `json:"workflows" datastore:"workflows"`
+	AppStats         []AppStats `json:"app_stats" datastore:"app_stats"`
+}
+
+type Mailcheck struct {
+	Targets            []string `json:"targets"`
+	Body               string   `json:"body"`
+	Subject            string   `json:"subject"`
+	Type               string   `json:"type"`
+	EmailApp           bool     `json:"email_app"`
+	SenderCompany      string   `json:"sender_company"`
+	WorkflowId         string   `json:"workflow_id"`
+	ReferenceExecution string   `json:"reference_execution"`
+	Authorization      string   `json:"authorization"`
+	ExecutionType      string   `json:"execution_type"`
+	Start              string   `json:"start"`
+	Bcc                []string `json:"bcc"`
+}
+
+type SmsBody struct {
+	Numbers            []string `json:"numbers" datastore:"numbers"`
+	Body               string   `json:"body" datastore:"body"`
+	ReferenceExecution string   `json:"reference_execution"`
+	Authorization      string   `json:"authorization"`
+	WorkflowId         string   `json:"workflow_id"`
+	ExecutionType      string   `json:"execution_type"`
+	Start              string   `json:"start"`
+}
+
+type UserInputResponse struct {
+	Success     bool   `json:"success"`
+	Source      string `json:"source"`
+	Reason      string `json:"reason"`
+	Information string `json:"information"`
+	ClickInfo   struct {
+		Clicked bool   `json:"clicked"`
+		Time    int64  `json:"time"`
+		IP      string `json:"ip"`
+		User    string `json:"user"`
+		Note    string `json:"note"`
+	} `json:"click_info"`
+	Subflow struct {
+		Success       bool   `json:"success"`
+		ExecutionID   string `json:"execution_id"`
+		Authorization string `json:"authorization"`
+	} `json:"subflow"`
+	SubflowURL     string `json:"subflow_url"`
+	DeclineSubflow struct {
+		Success     bool   `json:"success"`
+		ExecutionID string `json:"execution_id"`
+		WorkflowID  string `json:"workflow_id"`
+	} `json:"decline_subflow"`
+	DeclineSubflowURL string `json:"decline_subflow_url"`
+}
+
+type SchemalessOutput struct {
+	Success bool   `json:"success"`
+	Action  string `json:"action"`
+	Status  int    `json:"status,omitempty"`
+	URL     string `json:"url,omitempty"`
+
+	// JSON output. Or not? What if it's a list?
+	Output interface{} `json:"output,omitempty"`
+
+	// Optional. Used for error handling.
+	RawResponse interface{} `json:"raw_response,omitempty"`
+	Retries     int         `json:"retries,omitempty"`
+
+	CategoryLabels []string `json:"category_labels,omitempty"`
+	ActionName     string   `json:"action_name,omitempty"`
+}
+
+type CategoryActionFieldOverride struct {
+	Fields map[string]interface{} `json:"fields"`
+}
+
+type CategoryAction struct {
+	AppName string         `json:"app_name"`
+	Label   string         `json:"label"`
+	Fields  []Valuereplace `json:"fields"`
+
+	// Optional~
+	AppVersion     string         `json:"app_version"`
+	AppId          string         `json:"app_id"`
+	ActionName     string         `json:"action_name"`
+	Category       string         `json:"category"`
+	OptionalFields []Valuereplace `json:"optional_fields"`
+
+	AuthenticationId      string `json:"authentication_id"`       // Controls app authentication ID
+	Step                  int64  `json:"step"`                    // The step to use put it in a workflow if generated
+	Query                 string `json:"query,omitempty"`         // Due to the API being built around programmatic, and then with LLMs, this was added to make context possible between nodes when using Atomic Actions
+	DryRun                bool   `json:"dry_run"`                 // If true, it will not actually execute the action, but instead just build the workflow
+	SkipOutputTranslation bool   `json:"skip_output_translation"` // If true, it will not translate the output to the default format for the label
+	SkipAuthentication    bool   `json:"skip_authentication"`
+	Environment           string `json:"environment"` // The environment to use for the action (Orborus)
+	App                   string `jjson:"app"`        // The app to use for the action (Orborus)
+	Action                string `json:"action"`      // The action to use for the action (Orborus)
+
+	KeepWorkflow bool `json:"keep_workflow"` // Opposite, as we want the default to be false for Singul
+	//SkipWorkflow          bool   `json:"skip_workflow"`           // If true, it will not put it in a workflow, but instead just execute it
+
+	OrgId         string `json:"org_id"`
+	WorkflowId    string `json:"workflow_id"`   // Forces it to use a specific workflow ID. This can be used to build multiple steps in the same workflow
+	ExecutionId   string `json:"execution_id"`  // Execution auth
+	Authorization string `json:"authorization"` // Execution auth
+}
+
+type LabelStruct struct {
+	Category string `json:"category"`
+	Label    string `json:"label"`
+}
+
+type AppLabel struct {
+	AppName    string        `json:"app_name"`
+	LargeImage string        `json:"large_image"`
+	ID         string        `json:"id"`
+	Labels     []LabelStruct `json:"labels"`
+}
+
+type AppCategoryLabel struct {
+	Label          string        `json:"label"`
+	FormattedLabel string        `json:"formatted_label"`
+	Apps           []WorkflowApp `json:"apps"`
+}
+
+type AppCategory struct {
+	Name           string              `json:"name"`
+	Color          string              `json:"color"`
+	Icon           string              `json:"icon"`
+	ActionLabels   []string            `json:"action_labels"`
+	AppLabels      []AppLabel          `json:"app_labels"`
+	RequiredFields map[string][]string `json:"required_fields"`
+	OptionalFields map[string][]string `json:"optional_fields"`
+}
+
+type SingleResult struct {
+	Success       bool           `json:"success"`
+	Result        string         `json:"result"`
+	Id            string         `json:"id"`
+	ExecutionId   string         `json:"execution_id"`
+	Authorization string         `json:"authorization"`
+	Errors        []string       `json:"errors"`
+	Validation    TypeValidation `json:"validation"`
+
+	Parameters []WorkflowAppActionParameter `json:"parameters"`
+}
+
+type DockerRequestCheck struct {
+	Name         string `datastore:"name" json:"name" yaml:"name"`
+	Image        string `datastore:"image" json:"image" yaml:"image"`
+	ImageVersion string `datastore:"image_version" json:"image_version" yaml:"image_version"`
+}
+
+type Recommendations struct {
+	AppName    string `json:"app_name"`
+	AppVersion string `json:"app_version"`
+	AppAction  string `json:"app_action"`
+	AppId      string `json:"app_id"`
+	LargeImage string `json:"large_image"`
+}
+
+type RecommendAction struct {
+	AppName         string            `json:"app_name"`
+	ActionId        string            `json:"action_id"`
+	Recommendations []Recommendations `json:"recommendations"`
+}
+
+type RecommendationAction struct {
+	Action string `json:"action"`
+	Name   string `json:"name"`
+}
+
+type ActionRecommendations struct {
+	Success bool              `json:"success"`
+	Actions []RecommendAction `json:"actions"`
+}
+
+type AppLabelData struct {
+	AppName    string   `json:"app_name" datastore:"app_name"`
+	AppId      string   `json:"app_id" datastore:"app_id"`
+	AppVersion string   `json:"app_version" datastore:"app_version"`
+	Categories []string `json:"categories" datastore:"categories"`
+	ImageURL   string   `json:"image_url" datastore:"image_url"`
+	//LabeledActions []LabeledAction `json:"labeled_actions" datastore:"labeled_actions"`
+
+	ActionName string `json:"action_name" datastore:"action_name"`
+	Label      string `json:"label" datastore:"label"`
+}
+
+type Suggestion struct {
+	Creator   string       `json:"creator" datastore:"creator"`
+	CreatorId string       `json:"creator_id" datastore:"creator_id"`
+	Type      string       `json:"type" datastore:"type"`
+	Label     AppLabelData `json:"label" datastore:"label"`
+	Created   int64        `json:"created" datastore:"created"`
+	Edited    int64        `json:"edited" datastore:"edited"`
+
+	SuggestionID string `json:"suggestion_id" datastore:"suggestion_id"`
+	SuggestionBy string `json:"suggestion_by" datastore:"suggestion_by"`
+
+	Status string `json:"status" datastore:"status"`
+}
+
+// Parse out CPU, memory and disk. Make struct
+type OrborusStats struct {
+	// Environment name~
+	Id string `json:"id"`
+
+	// Unique identifier for the current orborus runtime
+	// Used to track which Orborus can run
+	Uuid string `json:"uuid" datastore:"uuid"`
+
+	OrgId        string `json:"org_id"`
+	Environment  string `json:"environment"`
+	OrborusLabel string `json:"orborus_label"`
+	Timestamp    int64  `json:"timestamp"`
+	Swarm        bool   `json:"swarm"`
+	Kubernetes   bool   `json:"kubernetes"`
+
+	// Shuffle
+	MaxQueue int `json:"max_queue"`
+	Queue    int `json:"queue"`
+	PollTime int `json:"poll_time"`
+
+	// General
+	MaxCPU     int     `json:"max_cpu"`
+	CPU        int     `json:"cpu"`
+	CPUPercent float64 `json:"cpu_percent"`
+
+	MaxMemory     int     `json:"max_memory"`
+	Memory        int     `json:"memory"`
+	MemoryPercent float64 `json:"memory_percent"`
+
+	MaxDisk     int     `json:"max_disk"`
+	Disk        int     `json:"disk"`
+	DiskPercent float64 `json:"disk_percent"`
+
+	// Docker
+	AppContainers     int `json:"app_containers"`
+	WorkerContainers  int `json:"worker_containers"`
+	StoppedContainers int `json:"stopped_containers"`
+	TotalContainers   int `json:"total_containers"`
+
+	// Host tracking (sensor mode)
+	SensorDetails SensorDetails `json:"sensor_details" datastore:"sensor_details"`
+
+	// New cache mechanics to keep better track of running/not running
+	RunningIp string     `json:"running_ip"`
+	Licensed  bool       `json:"licensed"`
+	DataLake  LakeConfig `json:"data_lake" datastore:"data_lake"`
+}
+
+// Create struct
+type ExecutionReturn struct {
+	Success    bool                `json:"success"`
+	Id         string              `json:"id"`
+	Executions []WorkflowExecution `json:"executions"`
+	Cursor     string              `json:"cursor"`
+
+	Timeline []WidgetPointData `json:"timeline"`
+}
+
+// Create struct
+type CacheReturn struct {
+	Success     bool   `json:"success"`
+	Amount      int    `json:"amount"`
+	Cursor      string `json:"cursor"`
+	TotalAmount int    `json:"total_amount"`
+
+	Category   string                  `json:"category"`
+	Config     DatastoreCategoryUpdate `json:"category_config,omitempty"`
+	Categories []string                `json:"categories,omitempty"`
+
+	Keys  []CacheKeyData           `json:"keys,omitempty"`
+	Items []map[string]interface{} `json:"items,omitempty"`
+
+	Reason string `json:"reason,omitempty"`
+	Key    string `json:"key,omitempty"`
+	Value  string `json:"value,omitempty"`
+}
+
+type GCPIncident struct {
+	Incident struct {
+		Condition struct {
+			ConditionMatchedLog struct {
+				Filter             string   `json:"filter"`
+				ResourceContainers []string `json:"resourceContainers"`
+			} `json:"conditionMatchedLog"`
+			DisplayName string `json:"displayName"`
+			Name        string `json:"name"`
+		} `json:"condition"`
+		ConditionName string `json:"condition_name"`
+		IncidentID    string `json:"incident_id"`
+		Metadata      struct {
+			SystemLabels struct {
+			} `json:"system_labels"`
+			UserLabels struct {
+			} `json:"user_labels"`
+		} `json:"metadata"`
+		Metric struct {
+			DisplayName string `json:"displayName"`
+			Labels      struct {
+			} `json:"labels"`
+			Type string `json:"type"`
+		} `json:"metric"`
+		PolicyName string `json:"policy_name"`
+		Resource   struct {
+			Labels struct {
+				FunctionName string `json:"function_name"`
+				ProjectID    string `json:"project_id"`
+				Region       string `json:"region"`
+			} `json:"labels"`
+			Type string `json:"type"`
+		} `json:"resource"`
+		ResourceID              string `json:"resource_id"`
+		ResourceName            string `json:"resource_name"`
+		ResourceTypeDisplayName string `json:"resource_type_display_name"`
+		ScopingProjectID        string `json:"scoping_project_id"`
+		ScopingProjectNumber    int64  `json:"scoping_project_number"`
+		StartedAt               int    `json:"started_at"`
+		State                   string `json:"state"`
+		Summary                 string `json:"summary"`
+		URL                     string `json:"url"`
+	} `json:"incident"`
+	Version string `json:"version"`
+}
+
+type AppHealth struct {
+	Create      bool        `json:"create"`
+	Run         bool        `json:"run"`
+	Delete      bool        `json:"delete"`
+	Validate    bool        `json:"validate"`
+	AppId       string      `json:"app_id"`
+	Read        bool        `json:"read"`
+	Result      string      `json:"result"`
+	ExecutionID string      `json:"execution_id"`
+	Error       AppOpsError `json:"error"`
+}
+
+type AppOpsError struct {
+	Create   string `json:"create"`
+	Run      string `json:"run"`
+	Delete   string `json:"delete"`
+	Validate string `json:"validate"`
+	Read     string `json:"read"`
+}
+
+type DatastoreHealth struct {
+	Create bool              `json:"create"`
+	Read   bool              `json:"read"`
+	Result string            `json:"result"`
+	Delete bool              `json:"delete"`
+	Error  DatastoreOpsError `json:"error"`
+}
+
+type DatastoreOpsError struct {
+	Create string `json:"create"`
+	Read   string `json:"read"`
+	Delete string `json:"delete"`
+}
+
+type FileHealth struct {
+	Create bool         `json:"create"`
+	FileId string       `json:"fileId"`
+	Upload bool         `json:"get_file"`
+	Delete bool         `json:"delete"`
+	Error  FileOpsError `json:"error"`
+}
+
+type FileOpsError struct {
+	Create string `json:"create"`
+	Upload string `json:"upload"`
+	Delete string `json:"delete"`
+}
+
+type WorkflowHealth struct {
+	Create         bool   `json:"create"`
+	Run            bool   `json:"run"`
+	BackendVersion string `json:"backend_version"`
+	RunFinished    bool   `json:"run_finished"`
+	// NOTE: This does not represent the actual time execution took, it includes the time took to send an API request for the exeution + get back the results for every action.
+	ExecutionTook      float64          `json:"execution_took"`
+	RunStatus          string           `json:"run_status"`
+	Delete             bool             `json:"delete"`
+	ExecutionId        string           `json:"execution_id"`
+	WorkflowId         string           `json:"workflow_id"`
+	WorkflowValidation bool             `json:"workflow_validation"`
+	Error              WorkflowOpsError `json:"error"`
+}
+
+type WorkflowOpsError struct {
+	Create             string `json:"create"`
+	Run                string `json:"run"`
+	Delete             string `json:"delete"`
+	RunFinished        string `json:"run_finished"`
+	WorkflowValidation string `json:"workflow_validation"`
+}
+
+type RegionChangeHistory struct {
+	OrgId       string `json:"org_id"`
+	LastAttempt int64  `json:"last_attempt"`
+}
+
+type LiveExecutionStatus struct {
+	ID                string `json:"id"`
+	Failed            int    `json:"failed"`
+	Executing         int    `json:"executing"`
+	Finished          int    `json:"finished"`
+	Aborted           int    `json:"aborted"`
+	NotificationCount int    `json:"notification_count"`
+
+	CreatedAt int64 `json:"created_at"`
+}
+
+type HealthCheck struct {
+	Success   bool           `json:"success"`
+	Updated   int64          `json:"updated"`
+	Apps      AppHealth      `json:"apps"`
+	Workflows WorkflowHealth `json:"workflows"`
+	Agents    AgentHealth    `json:"agents"`
+	//PythonApps    AppHealth                       `json:"python_apps"`
+	Datastore     DatastoreHealth                 `json:"datastore"`
+	FileOps       FileHealth                      `json:"fileops"`
+	OpensearchOps opensearchapi.ClusterHealthResp `json:"opensearch"`
+}
+
+type HealthCheckDB struct {
+	Success    bool                            `json:"success"`
+	Updated    int64                           `json:"updated"`
+	Workflows  WorkflowHealth                  `json:"workflows"`
+	Agents     AgentHealth                     `json:"agents"`
+	Opensearch opensearchapi.ClusterHealthResp `json:"opensearch"`
+	Datastore  DatastoreHealth                 `json:"datastore"`
+	FileOps    FileHealth                      `json:"fileops"`
+	Apps       AppHealth                       `json:"apps"`
+	ID         string                          `json:"id"`
+}
+
+type NodeData struct {
+	Name  string `json:"name"`
+	Count int    `json:"count"`
+}
+
+type NodeRelation struct {
+	AppCategory string     `json:"app_category"`
+	AppNames    []string   `json:"app_names"`
+	AppIds      []string   `json:"app_ids"`
+	Synonyms    []string   `json:"synonyms"`
+	Incoming    []NodeData `json:"incoming"`
+	Outgoing    []NodeData `json:"outgoing"`
+}
+
+type WorkflowNodeRelations struct {
+	Relations map[string]NodeRelation `json:"node_relations"`
+}
+
+// Anonymized data that is sent to the cloud
+// as backup. Saved in your organization and region
+type BackupJob struct {
+	Version    string `json:"version"`     // Instance version
+	LastSignin int64  `json:"last_signin"` // Last time user signed in
+
+	Stats     ExecutionInfo `json:"stats"`
+	Workflows []Workflow    `json:"workflows"`
+	Apps      []WorkflowApp `json:"apps"`
+
+	WorkflowBackup        bool  `json:"workflow_backup"`
+	AppBackup             bool  `json:"app_backup"`
+	AiCloudSync           bool  `json:"ai_cloud_sync"`
+	WorkflowBackupUpdated int64 `json:"workflow_backup_updated"`
+	AppBackupUpdated      int64 `json:"app_backup_updated"`
+	AiCloudSyncUpdated    int64 `json:"ai_cloud_sync_updated"`
+}
+
+type WorkflowSearch struct {
+	WorkflowId string `json:"workflow_id"`
+	Limit      int    `json:"limit"`
+	Cursor     string `json:"cursor"`
+
+	Status      string `json:"status"`
+	SearchFrom  string `json:"start_time"`
+	SearchUntil string `json:"end_time"`
+
+	IgnoreOrg  bool `json:"ignore_org"`
+	SuborgRuns bool `json:"suborg_runs" default:"false"`
+}
+
+type WorkflowSearchResult struct {
+	Success bool                `json:"success"`
+	Runs    []WorkflowExecution `json:"runs"`
+	Cursor  string              `json:"cursor"`
+}
+
+// Used for the integrations API to work with AI well
+type StructuredCategoryAction struct {
+	Success bool   `json:"success"`
+	Action  string `json:"action"`
+	Reason  string `json:"reason"`
+
+	WorkflowId  string        `json:"workflow_id,omitempty"`
+	ExecutionId string        `json:"execution_id,omitempty"`
+	Label       string        `json:"label,omitempty"`
+	Category    string        `json:"category,omitempty"`
+	Apps        []WorkflowApp `json:"apps,omitempty"`
+
+	ActionName     string   `json:"action_name,omitempty"`
+	CategoryLabels []string `json:"category_labels,omitempty"`
+
+	Result string `json:"result,omitempty"`
+
+	ApiDebuggerUrl string `json:"api_debugger_url,omitempty"`
+
+	AvailableLabels []string `json:"available_labels,omitempty"`
+	ThreadId        string   `json:"thread_id,omitempty"`
+	RunId           string   `json:"run_id,omitempty"`
+	MissingFields   []string `json:"missing_fields,omitempty"`
+
+	Translated bool `json:"translated,omitempty"`
+}
+
+type ModelLabelParameter struct {
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	Type        string `json:"type"`
+	Required    bool   `json:"required"`
+}
+
+type UserRequest struct {
+	IP        string `json:"ip"`
+	Method    string `json:"method"`
+	Path      string `json:"path"`
+	Timestamp int64  `json:"time"`
+}
+
+type HTTPOutput struct {
+	Success   bool   `json:"success"`
+	Reason    string `json:"reason,omitempty"`
+	Result    string `json:"result,omitempty"`
+	Exception string `json:"exception,omitempty"`
+	Details   string `json:"details,omitempty"`
+
+	Status  int               `json:"status,omitempty"`
+	Url     string            `json:"url,omitempty"`
+	Errors  []string          `json:"errors,omitempty"`
+	Body    interface{}       `json:"body,omitempty"`
+	Cookies map[string]string `json:"cookies,omitempty"`
+	Headers map[string]string `json:"headers,omitempty"`
+}
+
+type SnappStep struct {
+	Name        string         `json:"name" yaml:"name"`
+	Category    string         `json:"category" yaml:"category"`
+	AppName     string         `json:"app_name" yaml:"app_name"`
+	Environment string         `json:"environment" yaml:"environment"`
+	Fields      []Valuereplace `json:"fields" yaml:"fields"`
+}
+
+type SnappWf struct {
+	Name  string      `json:"name"`
+	Steps []SnappStep `json:"steps"`
+}
+
+type SSOResponse struct {
+	Success bool   `json:"success"`
+	Reason  string `json:"reason"`
+	URL     string `json:"url"`
+}
+
+type Training struct {
+	Name              string `json:"Name"`
+	Email             string `json:"Email"`
+	NumberOfAttendees int    `json:"numberOfAttendees"`
+	Message           string `json:"Message"`
+	Time              string `json:"Time"`
+	Country           string `json:"Country"`
+
+	OrgId      string `json:"org_id"`
+	UserId     string `json:"user_id"`
+	Username   string `json:"username"`
+	ID         string `json:"id"`
+	SignupTime int64  `json:"signupTime"`
+}
+
+type AppParser struct {
+	Success bool   `json:"success"`
+	OpenAPI []byte `json:"openapi"`
+	App     []byte `json:"app"`
+}
+
+type DetectionResponse struct {
+	Title             string              `json:"title"`
+	DetectionName     string              `json:"detection_name"`
+	Category          string              `json:"category"`
+	OrgId             string              `json:"org_id"`
+	DetectionInfo     []DetectionFileInfo `json:"detection_info"`
+	FolderDisabled    bool                `json:"folder_disabled"`
+	IsConnectorActive bool                `json:"is_connector_active"`
+
+	DownloadRepo string `json:"download_repo"`
+}
+
+// The raw output from pipelines in Tenzir
+type PipelineInfo struct {
+	ID           string `json:"id"`
+	Name         string `json:"name"`
+	Hidden       bool   `json:"hidden"`
+	Definition   string `json:"definition"`
+	Configured   bool   `json:"configured"`
+	Unstoppable  bool   `json:"unstoppable"`
+	CreatedAt    int64  `json:"created_at"`
+	LastModified int64  `json:"last_modified"`
+	StartTime    string `json:"start_time"`
+	TotalRuns    int    `json:"total_runs"`
+	State        string `json:"state"`
+	Error        string `json:"error"`
+	RetryDelay   string `json:"retry_delay"`
+	Autostart    struct {
+		Created   bool `json:"created"`
+		Completed bool `json:"completed"`
+		Failed    bool `json:"failed"`
+	} `json:"autostart"`
+	Autodelete struct {
+		Completed bool `json:"completed"`
+		Failed    bool `json:"failed"`
+		Stopped   bool `json:"stopped"`
+	} `json:"autodelete"`
+
+	//Package      any    `json:"package"`
+	//Diagnostics  []any  `json:"diagnostics"`
+	//Labels       []any  `json:"labels"`
+	//TTL          any `json:"ttl"`
+	//RemainingTTL any `json:"remaining_ttl"`
+
+	// Shuffle ref
+	Environment string `json:"environment"`
+}
+
+type PipelineInfoWrapper struct {
+	Pipelines []PipelineInfo `json:"pipelines"`
+}
+
+type RequestResponse struct {
+	Success bool   `json:"success"`
+	Reason  string `json:"reason"`
+	Details string `json:"details"`
+}
+
+type TimeWindow struct {
+	Duration time.Duration
+	Events   []time.Time
+	mu       sync.Mutex
+}
+
+// The execution details of a decision
+type AgentDecisionRunDetails struct {
+	Id string `json:"id" datastore:"id"`
+
+	StartedAt      int64    `json:"started_at" datastore:"started_at"`
+	CompletedAt    int64    `json:"completed_at" datastore:"completed_at"`
+	Type           string   `json:"type,omitempty" datastore:"type"`
+	Status         string   `json:"status" datastore:"status"`
+	RawResponse    string   `json:"raw_response,omitempty" datastore:"raw_response"`
+	DebugUrl       string   `json:"debug_url,omitempty" datastore:"debug_url"`
+	CategoryLabels []string `json:"category_labels,omitempty" datastore:"category_labels"`
+	ActionName     string   `json:"action_name,omitempty" datastore:"action_name"`
+}
+
+// Each decision
+type AgentDecision struct {
+
+	// Predictive Agent data
+	I                int            `json:"i" datastore:"i"`
+	Action           string         `json:"action" datastore:"action"`
+	Tool             string         `json:"tool" datastore:"tool"`
+	Category         string         `json:"category" datastore:"category"`
+	Confidence       float64        `json:"confidence" datastore:"confidence"`
+	Runs             string         `json:"runs,omitempty" datastore:"runs"`
+	Sources          string         `json:"sources,omitempty" datastore:"sources"`
+	Fields           []Valuereplace `json:"fields" datastore:"fields"`
+	Reason           string         `json:"reason,omitempty" datastore:"reason"`
+	ApprovalRequired bool           `json:"approval_required" datastore:"approval_required"`   // Set TRUE only for destructive/high-risk actions
+	DataFilter       string         `json:"data_filter,omitempty" datastore:"data_filter"`     // DataFilter controls how the raw tool response is reduced before being fed back into the agent.
+	Delay            string         `json:"delay,omitempty" datastore:"delay"`                 // Delay is the number of seconds to wait before executing the next decision.
+	FieldsNeeded     []string       `json:"fields_needed,omitempty" datastore:"fields_needed"` // FieldsNeeded is set by the agent alongside data_filter:"list".
+
+	// Responses
+	RunDetails AgentDecisionRunDetails `json:"run_details" datastore:"run_details"`
+}
+
+type HTTPWrapper struct {
+	ActionName             string `json:"action_name"`
+	URL                    string `json:"url"`
+	Headers                string `json:"headers"`
+	Body                   string `json:"body"`
+	Method                 string `json:"method"`
+	RequiresAuthentication bool   `json:"requires_authentication"`
+	Oauth2Auth             bool   `json:"oauth2_auth"`
+	CurlCommand            string `json:"curl_command"`
+	Apikey                 string `json:"apikey"`
+}
+
+type appAuthStruct struct {
+	Success bool      `json:"success"`
+	Reason  string    `json:"reason"`
+	Action  string    `json:"action"`
+	Apps    []AppMini `json:"apps"`
+}
+
+type SyncKey struct {
+	Apikey    string `json:"api_key"`
+	OrgId     string `json:"org_id"`
+	SourceIP  string `json:"source_ip"`
+	CreatedAt int64  `json:"created_at"`
+}
+
+type partnerReturnStruct struct {
+	Success bool     `json:"success"`
+	Partner *Partner `json:"partner"`
+}
+
+type AIWorkflowResponse struct {
+	AITriggers   []AITriggerItem   `json:"triggers"`
+	AIActions    []AIActionItem    `json:"actions"`
+	Comments     string            `json:"comments"`
+	AIConditions []AIConditionItem `json:"conditions"`
+}
+
+type AITriggerItem struct {
+	Index   int           `json:"index"`
+	AppName string        `json:"app_name"`
+	Label   string        `json:"label"`
+	Params  []AIParamItem `json:"parameters"`
+	Edited  bool          `json:"edited"` // If the trigger was edited by the user
+	ID      string        `json:"id"`     // Unique identifier for the trigger
+}
+
+type AIActionItem struct {
+	Index      int           `json:"index"`
+	AppName    string        `json:"app_name"`
+	ActionName string        `json:"action_name"`
+	Label      string        `json:"label"`
+	URL        string        `json:"url"`
+	Params     []AIParamItem `json:"parameters"`
+	Edited     bool          `json:"edited"` // If the action was edited by the user
+	ID         string        `json:"id"`     // Unique identifier for the action
+}
+
+type AIParamItem struct {
+	Name  string `json:"name"`
+	Value string `json:"value"`
+}
+
+type AIConditionItem struct {
+	SourceIndex      int              `json:"source_index"`
+	DestinationIndex int              `json:"destination_index"`
+	Condition        AIConditionValue `json:"condition"`
+	Source           AIConditionValue `json:"source"`
+	Destination      AIConditionValue `json:"destination"`
+}
+
+type AIConditionValue struct {
+	Name  string `json:"name"`
+	Value string `json:"value"`
+}
+
+type AppCategoryItem struct {
+	AppName    string   `json:"app_name"`
+	Categories []string `json:"categories"`
+}
+
+type WorkflowEditAIRequest struct {
+	Query       string `json:"query"`
+	WorkflowID  string `json:"workflow_id"`
+	OrgID       string `json:"org_id"`
+	Environment string `json:"environment"`
+
+	Workflow Workflow `json:"workflow"`
+}
+
+type MinimalParameter struct {
+	Name  string `json:"name"`
+	Value string `json:"value"`
+}
+
+func (m *MinimalParameter) UnmarshalJSON(data []byte) error {
+	type Alias MinimalParameter
+	var aux struct {
+		Value json.RawMessage `json:"value"`
+		*Alias
+	}
+	aux.Alias = (*Alias)(m)
+	if err := json.Unmarshal(data, &aux); err != nil {
+		return err
+	}
+
+	if len(aux.Value) > 0 {
+		if aux.Value[0] == '"' {
+			var str string
+			if err := json.Unmarshal(aux.Value, &str); err != nil {
+				return err
+			}
+			m.Value = str
+		} else {
+			m.Value = string(aux.Value)
+		}
+	}
+	return nil
+}
+
+// MinimalAction - action with position and basic info
+type MinimalAction struct {
+	AppName    string             `json:"app_name"`
+	AppID      string             `json:"app_id"`
+	ID         string             `json:"id"`
+	Label      string             `json:"label"`
+	Name       string             `json:"action_name"`
+	Parameters []MinimalParameter `json:"parameters"`
+	Errors     []string           `json:"errors,omitempty"`
+	X          int64              `json:"x"`
+	Y          int64              `json:"y"`
+	IsStart    bool               `json:"is_start"`
+}
+
+// MinimalTrigger - trigger with position and basic info
+type MinimalTrigger struct {
+	ID         string             `json:"id"`
+	AppName    string             `json:"app_name"`
+	Label      string             `json:"label"`
+	Parameters []MinimalParameter `json:"parameters"`
+	X          int64              `json:"x"`
+	Y          int64              `json:"y"`
+	IsStart    bool               `json:"is_start"`
+}
+
+// MinimalBranch - branch connecting nodes
+type MinimalBranch struct {
+	ID            string             `json:"id"`
+	SourceID      string             `json:"source_id"`
+	DestinationID string             `json:"destination_id"`
+	Label         string             `json:"label"`
+	Conditions    []MinimalCondition `json:"conditions,omitempty"`
+}
+
+// MinimalCondition - condition with minimal parameters
+type MinimalCondition struct {
+	Source      MinimalConditionParam `json:"source"`
+	Condition   MinimalConditionParam `json:"condition"`
+	Destination MinimalConditionParam `json:"destination"`
+}
+
+// MinimalConditionParam - minimal parameter for conditions (id, name, value only)
+type MinimalConditionParam struct {
+	ID    string `json:"id"`
+	Name  string `json:"name"`
+	Value string `json:"value"`
+}
+
+// MinimalWorkflow - minimal workflow structure with node positions and connections
+type MinimalWorkflow struct {
+	Actions        []MinimalAction  `json:"actions"`
+	Branches       []MinimalBranch  `json:"branches"`
+	Triggers       []MinimalTrigger `json:"triggers"`
+	Errors         []string         `json:"errors,omitempty"`
+	StartTriggerID string           `json:"start_trigger_id,omitempty"`
+}
+
+type NGramItem struct {
+	Key   string `json:"key"`
+	OrgId string `json:"org_id,omitempty"`
+
+	Amount int      `json:"amount"`
+	Ref    []string `json:"ref"` // Reference to other items
+}
+
+type AIConfig struct {
+	Generated bool   `json:"generated" datastore:"generated"`
+	Prompt    string `json:"prompt" datastore:"prompt"`
+	Model     string `json:"model" datastore:"model"`
+	Status    string `json:"status" datastore:"status"`
+}
+
+type ProcessInfo struct {
+	PID         int32  `json:"pid"`
+	PPID        int32  `json:"ppid,omitempty"`
+	TTY         string `json:"tty,omitempty"`
+	CommandLine string `json:"command_line,omitempty"`
+	User        string `json:"user,omitempty"`
+
+	Args         []string `json:"args,omitempty"`
+	CreationTime int64    `json:"creation_time,omitempty"`
+	ExePath      string   `json:"exe_path,omitempty"`
+	SHA256       string   `json:"sha256,omitempty"`
+
+	ProcessName string `json:"process_name"`
+}
+
+type UserInfo struct {
+	UserID   string   `json:"user_id"`
+	Username string   `json:"username"`
+	Groups   []string `json:"groups,omitempty"`
+}
+
+type TelemetryConfig struct {
+	Enabled       bool              `json:"enabled"`
+	Modes         []string          `json:"modes"`
+	BufferSize    int               `json:"buffer_size"`
+	FlushInterval time.Duration     `json:"flush_interval"`
+	Filters       []TelemetryFilter `json:"filters,omitempty"`
+}
+
+type TelemetryFilter struct {
+	Type    string   `json:"type"`
+	Include []string `json:"include,omitempty"`
+	Exclude []string `json:"exclude,omitempty"`
+}
+
+// EDR and Audit Log Monitoring Structs
+type AuditLogEntry struct {
+	Timestamp   time.Time              `json:"timestamp"`
+	EventID     string                 `json:"event_id"`
+	EventType   string                 `json:"event_type"`
+	Source      string                 `json:"source"`
+	Level       string                 `json:"level"`
+	ProcessInfo *ProcessInfo           `json:"process_info,omitempty"`
+	UserInfo    *UserInfo              `json:"user_info,omitempty"`
+	Message     string                 `json:"message"`
+	RawData     string                 `json:"raw_data,omitempty"`
+	Platform    string                 `json:"platform"`
+	Metadata    map[string]interface{} `json:"metadata,omitempty"`
+}
+
+// Thread conversation access control structs
+type ThreadAccessRequest struct {
+	ThreadID string `json:"thread_id"`
+}
+
+type ConversationAccessRequest struct {
+	ConversationID string `json:"conversation_id"`
+}
+
+type ConversationResponse struct {
+	Success        bool                  `json:"success"`
+	ConversationID string                `json:"conversation_id"`
+	OrgID          string                `json:"org_id"` // Org where thread lives (for switching orgs)
+	Messages       []ConversationMessage `json:"messages"`
+	IsActiveOrg    bool                  `json:"is_active_org"` // Whether this is user's active org
+}
+
+type ConversationMessage struct {
+	UserId    string    `json:"user_id"`
+	Role      string    `json:"role"` // "user" or "assistant"
+	Content   string    `json:"content"`
+	Timestamp time.Time `json:"timestamp"`
+}
+
+// Conversation metadata
+type Conversation struct {
+	Id           string `json:"id" datastore:"id"`
+	Title        string `json:"title" datastore:"title"`
+	OrgId        string `json:"org_id" datastore:"org_id"`
+	UserId       string `json:"user_id" datastore:"user_id"`
+	CreatedAt    int64  `json:"created_at" datastore:"created_at"`
+	UpdatedAt    int64  `json:"updated_at" datastore:"updated_at"`
+	MessageCount int    `json:"message_count" datastore:"message_count"`
+}
+
+type StreamData struct {
+	Type  string `json:"type"` // "chunk", "done", "error"
+	Chunk string `json:"chunk,omitempty"`
+	Data  string `json:"data,omitempty"` // For the final ID or error
+}
+
+type StreamWorkflowOperation struct {
+	Item      string          `json:"item"`               // "node", "edge", "workflow"
+	Type      string          `json:"type"`               // "add", "move", "remove", "select", "unselect", "hover", "configure", "save", "enter"
+	ID        string          `json:"id"`                 // node/edge/workflow ID
+	UserID    string          `json:"user_id"`            // who performed the op (user ID or "agent")
+	Username  string          `json:"username,omitempty"` // display name of the user
+	Data      json.RawMessage `json:"data,omitempty"`     // full node/edge data for "add" ops
+	Location  *Position       `json:"location,omitempty"` // position for "move"/"add" ops
+	Fields    []Valuereplace  `json:"fields,omitempty"`   // for "configure" ops
+	Sequence  int64           `json:"sequence"`           // monotonic ordering per workflow
+	Timestamp int64           `json:"timestamp"`          // unix ms
+}
+
+type StreamPresenceEntry struct {
+	UserID   string `json:"user_id"`
+	Username string `json:"username"`
+	LastSeen int64  `json:"last_seen"`
+	Color    string `json:"color"`
+}
+
+type StreamPresenceState struct {
+	Users []StreamPresenceEntry `json:"users"`
+}
+
+// StreamPresenceResponse is returned by the presence_only endpoint.
+type StreamPresenceResponse struct {
+	Success bool                  `json:"success"`
+	Count   int                   `json:"count"`
+	Users   []StreamPresenceEntry `json:"users"`
+	Seq     int64                 `json:"seq"`
+}
+
+type MockToolCall struct {
+	URL      string                 `json:"url"`
+	Method   string                 `json:"method"`
+	Fields   map[string]string      `json:"fields"`
+	Response map[string]interface{} `json:"response"`
+}
+
+type MockUseCaseData struct {
+	UseCase           string          `json:"use_case"`
+	UserPrompt        string          `json:"user_prompt"`
+	ToolCalls         []MockToolCall  `json:"tool_calls"`
+	ExpectedDecisions []AgentDecision `json:"expected_decisions"`
+}
+
+type AgentStartResponse struct {
+	Success       bool   `json:"success"`
+	ExecutionId   string `json:"execution_id"`
+	Authorization string `json:"authorization"`
+}
+
+type AgentStartRequest struct {
+	ID          string              `json:"id"`
+	Name        string              `json:"name"`
+	AppName     string              `json:"app_name"`
+	AppID       string              `json:"app_id"`
+	AppVersion  string              `json:"app_version"`
+	Environment string              `json:"environment"`
+	Parameters  []map[string]string `json:"parameters"`
+}
+
+type StreamsResultResponse struct {
+	Result  string         `json:"result"`
+	Results []ActionResult `json:"results"`
+	Status  string         `json:"status"`
+}
+
+type StreamsResultRequest struct {
+	ExecutionID   string `json:"execution_id"`
+	Authorization string `json:"authorization"`
+}
+
+type TestResponse struct {
+	Success bool         `json:"success"`
+	Total   int          `json:"total"`
+	Passed  int          `json:"passed"`
+	Failed  int          `json:"failed"`
+	Results []TestResult `json:"results"`
+}
+
+type TestResult struct {
+	TestCase string `json:"test_case"`
+	Status   string `json:"status"`
+	Error    string `json:"error,omitempty"`
+}
+
+type MCPRequestInput struct {
+	Text  string `json:"text"`
+	Voice string `json:"voice"`
+
+	Images []struct {
+		URL    string `json:"url"`
+		Detail string `json:"detail,omitempty"`
+	}
+
+	// Special cases for templates
+	WorkflowId      string `json:"workflow_id,omitempty"`
+	IncidentId      string `json:"incident_id,omitempty"`
+	VulnerabilityId string `json:"vulnerability_id,omitempty"`
+}
+
+type MCPRequestParams struct {
+	ToolName string          `json:"tool_name"`
+	Input    MCPRequestInput `json:"input"`
+	Context  struct {
+		SessionID string `json:"session_id"`
+	} `json:"context"`
+	ToolID string `json:"tool_id"`
+
+	Environment      string `json:"environment"`
+	EnableQuestions  bool   `json:"enable_questions"`
+	AuthenticationId string `json:"authentication_id"`
+	Reasoning        string `json:"reasoning"`
+	Template         string `json:"template"` // Controls presets like "workflow-edit" to add special backend-controlled system messages
+
+	// From testing in Lovable
+	ProtocolVersion string `json:"protocolVersion"`
+	Capabilities    struct {
+		Roots struct {
+			ListChanged bool `json:"listChanged"`
+		} `json:"roots"`
+		Sampling struct {
+		} `json:"sampling"`
+		Tools struct {
+			ListChanged bool `json:"listChanged"`
+		} `json:"tools"`
+
+		// OpenAI testing
+		Experimental struct {
+			OpenaiVisibility struct {
+				Enabled bool `json:"enabled"`
+			} `json:"openai/visibility"`
+		} `json:"openAiVisibility"`
+		Extensions struct {
+			IoModelContextProtocolUi struct {
+				MimeTypes []string `json:"mimeTypes"`
+			} `json:"io.modelcontextprotocol/ui"`
+		} `json:"extensions"`
+	} `json:"capabilities"`
+	ClientInfo struct {
+		Name    string `json:"name"`
+		Version string `json:"version"`
+	} `json:"clientInfo"`
+}
+
+// Standard used for MCP
+type MCPRequest struct {
+	Jsonrpc string           `json:"jsonrpc"`
+	ID      int              `json:"id"`
+	Method  string           `json:"method"`
+	Params  MCPRequestParams `json:"params"`
+}
+
+type MCPResponse struct {
+	Jsonrpc string                 `json:"jsonrpc"`
+	ID      int                    `json:"id"`
+	Result  map[string]interface{} `json:"result,omitempty"`
+}
+
+type MCPInitResponse struct {
+	Jsonrpc string        `json:"jsonrpc"`
+	ID      int           `json:"id"`
+	Result  MCPToolResult `json:"result,omitempty"`
+}
+
+type MCPCapabilitiesTools struct {
+	List bool `json:"list"`
+	Call bool `json:"call"`
+}
+
+type MCPCapabilities struct {
+	Tools MCPCapabilitiesTools `json:"tools"`
+}
+
+type MCPServerInfo struct {
+	Name    string `json:"name"`
+	Version string `json:"version"`
+}
+
+type MCPToolResult struct {
+	ProtocolVersion string          `json:"protocolVersion"`
+	Capabilities    MCPCapabilities `json:"capabilities"`
+	ServerInfo      MCPServerInfo   `json:"serverInfo"`
+	Tools           []MCPTool       `json:"tools"`
+}
+
+type MCPTool struct {
+	Name        string             `json:"name"`
+	Description string             `json:"description"`
+	InputSchema MCPToolInputSchema `json:"inputSchema"`
+}
+
+type MCPProperty struct {
+	Type        string `json:"type"`
+	Description string `json:"description,omitempty"`
+}
+
+type MCPToolInputSchema struct {
+	Type       string                 `json:"type"`
+	Properties map[string]MCPProperty `json:"properties"`
+	Required   []string               `json:"required"`
+}
+
+type OpensearchPrefixFixResult struct {
+	Success           bool                               `json:"success"`
+	Reason            string                             `json:"reason,omitempty"`
+	ExpectedAliases   int                                `json:"expected_aliases,omitempty"`
+	FoundAliases      int                                `json:"found_aliases,omitempty"`
+	MissingAliases    []string                           `json:"missing_aliases,omitempty"`
+	InvalidWriteAlias []string                           `json:"invalid_write_aliases,omitempty"`
+	MigrationTasks    []string                           `json:"migration_tasks,omitempty"`
+	Created           []string                           `json:"created,omitempty"`
+	WriteIndexUpdates []string                           `json:"write_index_updates,omitempty"`
+	Reindexed         []string                           `json:"reindexed,omitempty"`
+	AliasUpdates      []string                           `json:"alias_updates,omitempty"`
+	Skipped           []string                           `json:"skipped,omitempty"`
+	Counts            []OpensearchPrefixFixCountSnapshot `json:"counts,omitempty"`
+}
+
+type OpensearchPrefixFixCountSnapshot struct {
+	SourceIndex string `json:"source_index"`
+	TargetIndex string `json:"target_index"`
+	SourceDocs  int64  `json:"source_docs"`
+	TargetDocs  int64  `json:"target_docs"`
+}
+
+type OpensearchAliasResponse map[string]OpensearchAliasEntry
+
+type OpensearchAliasEntry struct {
+	Aliases map[string]json.RawMessage `json:"aliases"`
+}
+
+type OpensearchIndexInfoResponse map[string]OpensearchIndexInfo
+
+type OpensearchIndexInfo struct {
+	Settings map[string]map[string]interface{} `json:"settings"`
+	Mappings map[string]interface{}            `json:"mappings"`
+}
+
+type OpensearchReindexRequest struct {
+	Source OpensearchReindexSourceDest `json:"source"`
+	Dest   OpensearchReindexSourceDest `json:"dest"`
+}
+
+type OpensearchReindexSourceDest struct {
+	Index string `json:"index"`
+}
+
+type OpensearchAliasActionsRequest struct {
+	Actions []OpensearchAliasAction `json:"actions"`
+}
+
+type OpensearchAliasAction struct {
+	Add    *OpensearchAliasActionTarget `json:"add,omitempty"`
+	Remove *OpensearchAliasActionTarget `json:"remove,omitempty"`
+}
+
+type OpensearchAliasActionTarget struct {
+	Index        string `json:"index"`
+	Alias        string `json:"alias"`
+	IsWriteIndex *bool  `json:"is_write_index,omitempty"`
+}
+
+type OpensearchCreateIndexRequest struct {
+	Settings map[string]interface{} `json:"settings,omitempty"`
+	Mappings map[string]interface{} `json:"mappings,omitempty"`
+}
+
+type OpensearchIndexConfig struct {
+	Aliases  map[string]OpensearchIndexAliasConfig `json:"aliases,omitempty"`
+	Settings map[string]interface{}                `json:"settings,omitempty"`
+	Mappings map[string]interface{}                `json:"mappings,omitempty"`
+}
+
+type OpensearchIndexAliasConfig struct {
+	IsWriteIndex bool `json:"is_write_index,omitempty"`
+}
+
+// Only partial part of it
+type AppBuildRequest struct {
+	Editing bool   `datastore:"editing"`
+	Id      string `datastore:"id"`
+	Image   string `datastore:"image"`
+}
+
+type AgentsOpsError struct {
+	Create          string `json:"create"`
+	Run             string `json:"run"`
+	Delete          string `json:"delete"`
+	RunFinished     string `json:"run_finished"`
+	AgentValidation string `json:"agent_validation"`
+}
+
+type AgentHealth struct {
+	Create             bool           `json:"create"`
+	Run                bool           `json:"run"`
+	BackendVersion     string         `json:"backend_version"`
+	RunFinished        bool           `json:"run_finished"`
+	ExecutionTook      float64        `json:"execution_took"`
+	RunStatus          string         `json:"run_status"`
+	Delete             bool           `json:"delete"`
+	ExecutionId        string         `json:"execution_id"`
+	WorkflowId         string         `json:"workflow_id"`
+	AgentNodeId        string         `json:"agent_node_id"`
+	AgentStatus        string         `json:"agent_status"`         // Status of the agent itself (RUNNING, FINISHED, ABORTED)
+	AgentDecisionCount int            `json:"agent_decision_count"` // Number of decisions made by the agent
+	LLMCallSuccess     bool           `json:"llm_call_success"`     // Whether the LLM call succeeded
+	Error              AgentsOpsError `json:"error"`
+}
+
+type WttrResponse struct {
+	CurrentCondition []struct {
+		TempC string `json:"temp_C"`
+	} `json:"current_condition"`
+}
+
+type Parsed struct {
+	Success       bool   `json:"success"`
+	ExecutionId   string `json:"execution_id"`
+	Authorization string `json:"authorization"`
+}
+
+// Data sent FROM Orborus->Backend about sensor mode
+type SensorDetails struct {
+	SensorMode bool   `json:"sensor_mode,omitempty" datastore:"sensor_mode"`
+	Checkin    int64  `json:"checkin" datastore:"checkin"`
+	Active     bool   `json:"active,omitempty" datastore:"active"`
+	Uuid       string `json:"uuid" datastore:"uuid"`
+
+	User     string `json:"user,omitempty" datastore:"user"`
+	Hostname string `json:"hostname,omitempty" datastore:"hostname"`
+	OS       string `json:"os,omitempty" datastore:"os"`
+	Arch     string `json:"arch,omitempty" datastore:"arch"`
+	Serial   string `json:"serial,omitempty" datastore:"serial,noindex"`
+	Isolated bool   `json:"isolated,omitempty" datastore:"isolated"`
+
+	ElevatedAccess bool `json:"elevated_access,omitempty" datastore:"elevated_access"`
+
+	// String, not bool => we want details
+	AutomaticScreenlockEnabled string        `json:"automatic_screen_lock_enabled,omitempty" datastore:"automatic_screen_lock_enabled"`
+	HdEncrypted                string        `json:"hd_encrypted,omitempty" datastore:"hd_encrypted"`
+	LogForwarding              string        `json:"log_forwarding,omitempty" datastore:"log_forwarding"`
+	ResponseActions            string        `json:"response_actions,omitempty" datastore:"response_actions"`
+	ProcessList                []ProcessInfo `json:"process_list,omitempty" datastore:"process_list,noindex"`
+	InstalledSoftware          []Software    `json:"installed_software,omitempty" datastore:"installed_software,noindex"`
+	CodeScanner                []ProjectInfo `json:"code_scanner,omitempty" datastore:"code_scanner,noindex"`
+}
+
+// Related to Orborus Agent Mode. Used locally.
+type SensorMode struct {
+	Enabled  bool   `json:"enabled" datastore:"enabled"`
+	Hostname string `json:"hostname" datastore:"hostname"`
+
+	// Compliance
+	ProcessListEnabled  string `json:"process_list_enabled" datastore:"process_list_enabled"`
+	SoftwareListEnabled string `json:"software_list_enabled" datastore:"software_list_enabled"`
+	CodeScannerEnabled  string `json:"code_scanner_enabled" datastore:"code_scanner_enabled"`
+	HdEncryptedCheck    string `json:"hd_encrypted_check" datastore:"hd_encrypted_check"`
+	ScreenlockCheck     string `json:"screenlock_check" datastore:"screenlock_check"`
+
+	// Monitoring
+	LogForwarding string `json:"log_forwarding" datastore:"log_forwarding"`
+
+	// Response
+	ResponseActions string `json:"response_actions" datastore:"response_actions"`
+}
+
+type RCEResult struct {
+	Success  bool   `json:"success"`
+	Hostname string `json:"hostname"`
+	Command  string `json:"command"`
+	Output   string `json:"output"`
+	Error    string `json:"error,omitempty"`
+}
+
+type HostDetails struct {
+	Hostname  string   `json:"hostname" datastore:"hostname"`
+	Paths     []string `json:"paths,omitempty" datastore:"path,noindex"`
+	Version   string   `json:"version,omitempty" datastore:"version,noindex"`
+	UpdatedAt int64    `json:"updated_at,omitempty" datastore:"updated_at"`
+	User      string   `json:"user,omitempty" datastore:"user,omitempty"`
+}
+
+type Software struct {
+	Name    string `json:"name" datastore:"name,noindex"`
+	OS      string `json:"os,omitempty" datastore:"os,omitempty"`
+	Version string `json:"version,omitempty" datastore:"version,noindex"`
+
+	Versions  []string      `json:"versions,omitempty" datastore:"version,noindex"`
+	Hostnames []HostDetails `json:"hostnames,omitempty" datastore:"hostnames,noindex"`
+
+	Source string `json:"source,omitempty" datastore:"source,omitempty"`
+	Path   string `json:"path,omitempty" datastore:"path,omitempty"`
+}
+
+// ProjectInfo holds details about a discovered project
+type ProjectInfo struct {
+	Path     string     `json:"path"`
+	Type     string     `json:"type"` // "golang", "python", "javascript"
+	Packages []Software `json:"packages"`
+
+	Versions  []string      `json:"versions,omitempty" datastore:"version,noindex"`
+	Hostnames []HostDetails `json:"hostnames,omitempty" datastore:"hostnames,noindex"`
+}
+
+// Scanner manages concurrent directory scanning
+type Scanner struct {
+	results chan ProjectInfo
+	wg      sync.WaitGroup
+	mu      sync.Mutex
+	visited map[string]bool // Track visited dirs to avoid symlink loops
+}
+
+type OrborusDownloadConfig struct {
+	BaseURL             string `json:"base_url"`
+	Queue               string `json:"queue"`
+	Auth                string `json:"auth"`
+	OrgID               string `json:"org_id"`
+	ProcessListEnabled  string `json:"process_list_enabled"`
+	SoftwareListEnabled bool   `json:"software_list_enabled"`
+	CodeScannerEnabled  bool   `json:"code_scanner_enabled"`
+	HDEncryptedCheck    bool   `json:"hd_encrypted_check"`
+	ScreenlockCheck     bool   `json:"screenlock_check"`
+
+	ResponseActions string `json:"response_actions"`
+	LogForwarding   string `json:"log_forwarding"`
+	AsRoot          bool   `json:"as_root"`
+
+	BinaryBaseURL string            `json:"binary_base_url"`
+	Binaries      map[string]string `json:"binaries"`
+}
+
+type NVDCPEResponse struct {
+	ResultsPerPage int          `json:"resultsPerPage"`
+	StartIndex     int          `json:"startIndex"`
+	TotalResults   int          `json:"totalResults"`
+	Products       []NVDProduct `json:"products"`
+}
+
+type NVDProduct struct {
+	CPE NVDCPEItem `json:"cpe"`
+}
+
+type NVDCPEItem struct {
+	CPEName      string `json:"cpeName"`
+	Deprecated   bool   `json:"deprecated"`
+	LastModified string `json:"lastModified"`
+	Created      string `json:"created"`
+}
+
+type NVDCVEResponse struct {
+	ResultsPerPage  int          `json:"resultsPerPage"`
+	StartIndex      int          `json:"startIndex"`
+	TotalResults    int          `json:"totalResults"`
+	Vulnerabilities []NVDCVEItem `json:"vulnerabilities"`
+}
+
+type NVDCVEItem struct {
+	CVE NVDCVEDetail `json:"cve"`
+}
+
+type NVDCVEDetail struct {
+	ID                    string           `json:"id"`
+	Published             string           `json:"published"`
+	LastModified          string           `json:"lastModified"`
+	Descriptions          []NVDDescription `json:"descriptions"`
+	Metrics               NVDMetrics       `json:"metrics"`
+	Weaknesses            []NVDWeakness    `json:"weaknesses"`
+	References            []NVDReference   `json:"references"`
+	Configurations        []NVDConfig      `json:"configurations"`
+	CISAExploitAdd        string           `json:"cisaExploitAdd,omitempty"`
+	CISAActionDue         string           `json:"cisaActionDue,omitempty"`
+	CISARequiredAction    string           `json:"cisaRequiredAction,omitempty"`
+	CISAVulnerabilityName string           `json:"cisaVulnerabilityName,omitempty"`
+}
+
+type NVDDescription struct {
+	Lang  string `json:"lang"`
+	Value string `json:"value"`
+}
+
+type NVDMetrics struct {
+	CVSSMetricV31 []NVDCVSSMetric `json:"cvssMetricV31"`
+	CVSSMetricV30 []NVDCVSSMetric `json:"cvssMetricV30"`
+	CVSSMetricV2  []NVDCVSSMetric `json:"cvssMetricV2"`
+}
+
+type NVDCVSSMetric struct {
+	Source   string      `json:"source"`
+	Type     string      `json:"type"`
+	CVSSData NVDCVSSData `json:"cvssData"`
+}
+
+type NVDCVSSData struct {
+	Version      string  `json:"version"`
+	VectorString string  `json:"vectorString"`
+	BaseScore    float64 `json:"baseScore"`
+	BaseSeverity string  `json:"baseSeverity"`
+}
+
+type NVDWeakness struct {
+	Description []NVDDescription `json:"description"`
+}
+
+type NVDReference struct {
+	URL    string   `json:"url"`
+	Source string   `json:"source"`
+	Tags   []string `json:"tags"`
+}
+
+type NVDConfig struct {
+	Nodes []NVDNode `json:"nodes"`
+}
+
+type NVDNode struct {
+	CPEMatch []NVDCPEMatch `json:"cpeMatch"`
+}
+
+type NVDCPEMatch struct {
+	Vulnerable            bool   `json:"vulnerable"`
+	Criteria              string `json:"criteria"`
+	VersionStartIncluding string `json:"versionStartIncluding,omitempty"`
+	VersionStartExcluding string `json:"versionStartExcluding,omitempty"`
+	VersionEndIncluding   string `json:"versionEndIncluding,omitempty"`
+	VersionEndExcluding   string `json:"versionEndExcluding,omitempty"`
+}
+
+type OSVReference struct {
+	Type string `json:"type"`
+	URL  string `json:"url"`
+}
+
+type OSVRange struct {
+	Type   string     `json:"type"`
+	Events []OSVEvent `json:"events"`
+}
+
+type OSVEvent struct {
+	Introduced   string `json:"introduced,omitempty"`
+	Fixed        string `json:"fixed,omitempty"`
+	LastAffected string `json:"last_affected,omitempty"`
+}
+
+// Keep appending as we find more missing fields
+type OSVDatabaseSpecific struct {
+	Source         string   `json:"source"`
+	CWEs           []string `json:"cwes,omitempty"`
+	Severity       string   `json:"severity,omitempty"`
+	GithubReviewed bool     `json:"github_reviewed,omitempty"`
+
+	GithubReviewedAt time.Time `json:"github_reviewed_at,omitempty"`
+	DateAdded        string    `json:"date_added,omitempty"`
+	ActionDue        string    `json:"action_due,omitempty"`
+	RequiredAction   string    `json:"required_action,omitempty"`
+	Vulnerability    string    `json:"vulnerability,omitempty"`
+	NvdPublishedAt   time.Time `json:"nvd_published_at,omitempty"`
+	CweIds           []string  `json:"cwe_ids,omitempty"`
+}
+
+type OSVEcosystemSpecific struct {
+	Severity string `json:"severity"`
+}
+
+type OSVAffected struct {
+	Package  OSVPackage `json:"package"`
+	Ranges   []OSVRange `json:"ranges"`
+	Versions []string   `json:"versions"`
+
+	EcosystemSpecific OSVEcosystemSpecific `json:"ecosystem_specific,omitempty"`
+	DatabaseSpecific  OSVDatabaseSpecific  `json:"database_specific,omitempty"`
+}
+
+type OSVSeverity struct {
+	Type  string `json:"type"`
+	Score string `json:"score"`
+}
+
+type OSVVulnerability struct {
+	ID            string         `json:"id"`
+	Summary       string         `json:"summary,omitempty" datastore:"summary,noindex"`
+	Details       string         `json:"details" datastore:"details,noindex"`
+	Aliases       []string       `json:"aliases"`
+	Modified      time.Time      `json:"modified"`
+	Published     time.Time      `json:"published"`
+	References    []OSVReference `json:"references,omitempty"`
+	Affected      []OSVAffected  `json:"affected,omitempty"`
+	Severity      []OSVSeverity  `json:"severity,omitempty"`
+	SchemaVersion string         `json:"schema_version"`
+	Related       []string       `json:"related,omitempty"`
+
+	DatabaseSpecific OSVDatabaseSpecific `json:"database_specific,omitempty"`
+
+	// Custom for Shuffle
+	CreatedAt int64  `json:"created_at,omitempty"`
+	Code      int    `json:"code,omitempty"`
+	Message   string `json:"message,omitempty"`
+}
+
+type VulnDbOutput struct {
+	Vulns         []OSVVulnerability `json:"vulns"`
+	NextPageToken string             `json:"next_page_token,omitempty"`
+	Cursor        string             `json:"cursor,omitempty"`
+
+	Code    int    `json:"code,omitempty"`
+	Message string `json:"message,omitempty"`
+}
+
+type OSVPackage struct {
+	Name      string `json:"name"`
+	Ecosystem string `json:"ecosystem"`
+	Purl      string `json:"purl"`
+}
+
+type VulnerabilityQuery struct {
+	ID string `json:"id,omitempty"`
+
+	PageToken string     `json:"page_token,omitempty"`
+	Version   string     `json:"version,omitempty"`
+	Package   OSVPackage `json:"package"`
+}
+
+type AiCallInfo struct {
+	Caller      string
+	OrgID       string
+	ExecutionId string
+
+	AuthenticationId string // To choose the Authentication ID to use
+
+	Resp http.ResponseWriter // Used to respond automatically if it exists
+}
+
+type DisplaySize struct {
+	DisplayID int `json:"display_id,omitempty"`
+	Width     int `json:"width"`
+	Height    int `json:"height"`
+
+	OffsetX int `json:"offset_x,omitempty"`
+	OffsetY int `json:"offset_y,omitempty"`
+}
+
+// Added remote control capabilities for windows
+type RemoteControl struct {
+	Op     string         `json:"op"`
+	Params map[string]any `json:"params"`
+}
+
+type RemoteControlActionBatch struct {
+	Actions []RemoteControl `json:"actions"`
+}
+
+type AgentVerifierResult struct {
+	Pass    bool
+	Reason  string // Skipped is true when the verifier was not run (missing input, LLM error, parse error). In that case the caller should accept the finish as-is.
+	Skipped bool
+}
+
+// AppSummary - Lightweight app info for AI agents (name + description + id)
+type AppSummary struct {
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	ID          string `json:"id"`
+}
+
+// ActionParameter - minimal action parameter info
+type ActionParameter struct {
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	Required    bool   `json:"required"`
+	Example     string `json:"example,omitempty"`
+}
+
+// ActionSummary - minimal action info for AI agents
+type ActionSummary struct {
+	Name        string            `json:"name"`
+	Description string            `json:"description"`
+	Parameters  []ActionParameter `json:"parameters"`
+}
+
+// AppActionResponse - actions grouped by app
+type AppActionResponse struct {
+	AppName        string          `json:"app_name"`
+	AppDescription string          `json:"app_description"`
+	AppID          string          `json:"app_id"`
+	Actions        []ActionSummary `json:"actions"`
+}
+
+// WorkflowOperation represents a single modification operation
+type WorkflowOperation struct {
+	Op             string          `json:"op"`                        // "add_node", "edit_node", "move_node", "delete_node", "add_branch", "edit_branch", "delete_branch", "add_condition", "edit_condition", "delete_condition"
+	NodeType       string          `json:"node_type,omitempty"`       // "action" or "trigger" (for node ops)
+	ID             string          `json:"id,omitempty"`              // Target ID for edit/delete/move ops OR real ID after creation
+	TempID         string          `json:"temp_id,omitempty"`         // Temporary ID provided by agent (for batch ops to reference new nodes)
+	BranchID       string          `json:"branch_id,omitempty"`       // For condition ops
+	ConditionIndex int             `json:"condition_index,omitempty"` // For edit/delete condition
+	InsertBefore   string          `json:"insert_before,omitempty"`   // Insert before this node ID
+	InsertAfter    string          `json:"insert_after,omitempty"`    // Insert after this node ID
+	Data           json.RawMessage `json:"data"`                      // MinimalAction, MinimalBranch, MinimalCondition, or position data
+}
+
+// WorkflowSetOpsRequest is the agent request to modify a workflow
+type WorkflowSetOpsRequest struct {
+	WorkflowID string              `json:"workflow_id"`
+	Operations []WorkflowOperation `json:"operations"`
+}
+
+// WorkflowSetOpsResponse returns the updated state
+type WorkflowSetOpsResponse struct {
+	Success           bool              `json:"success"`
+	WorkflowID        string            `json:"workflow_id"`
+	Message           string            `json:"message"`
+	OperationsApplied int               `json:"operations_applied"`
+	Workflow          *MinimalWorkflow  `json:"workflow"`
+	IDMapping         map[string]string `json:"id_mapping,omitempty"` // Maps temp_id → real_id for new nodes
+	CacheExpiresIn    int               `json:"cache_expires_in"`     // seconds
+	Error             string            `json:"error,omitempty"`
+	FailedAtOp        int               `json:"failed_at_op,omitempty"`
+}
+
+type rawField struct {
+	Name  string      `json:"name"`
+	Key   string      `json:"key,omitempty"`
+	Value interface{} `json:"value"`
+}
+
+type agentResponse struct {
+	Success       bool   `json:"success"`
+	ExecutionId   string `json:"execution_id"`
+	Authorization string `json:"authorization"`
+}
+
+type AgentWorkflowExecutionReturn struct {
+	WorkflowExecution WorkflowExecution `json:"workflow_execution"`
+	Workflow          MinimalWorkflow   `json:"workflow"`
+}
+
+type PixelFormat string
+type ElementRole string
+
+const (
+	FormatRGBA PixelFormat = "RGBA"
+	FormatBGRA PixelFormat = "BGRA"
+)
+
+const (
+	RoleButton    ElementRole = "button"
+	RoleText      ElementRole = "text"
+	RoleInput     ElementRole = "input"
+	RoleImage     ElementRole = "image"
+	RoleContainer ElementRole = "container"
+)
+
+// Frame represents standard screen data across macOS, Windows, and Linux.
+type Frame struct {
+	Width     int         `json:"width"`
+	Height    int         `json:"height"`
+	Stride    int         `json:"stride"` // Bytes per row (Width * 4 + padding)
+	Format    PixelFormat `json:"format"`
+	Timestamp time.Time   `json:"timestamp"`
+	Data      []byte      `json:"-"` // Raw uncompressed pixel array
+}
+
+type Rect struct {
+	X      float64 `json:"x"`
+	Y      float64 `json:"y"`
+	Width  float64 `json:"width"`
+	Height float64 `json:"height"`
+}
+
+type UIElement struct {
+	AppName    string `json:"app_name"`
+	Role       string `json:"role"`
+	Label      string `json:"label,omitempty"`
+	Value      string `json:"value,omitempty"`
+	ClickPoint Point  `json:"click_point"`
+	Rect       Rect   `json:"rect"`
+}
+
+type UIState struct {
+	Frame    *Frame      `json:"frame"`
+	Elements []UIElement `json:"elements"`
+}
+
+type ScreenshotWrapper struct {
+	ScreenSize DisplaySize `json:"screen_size"`
+	Cursor     Position    `json:"cursor"`
+
+	// Image -> Base64 -> Empty .Image in sensors.go
+	Image       []byte `json:"image,omitempty"`        // Raw
+	ImageBase64 string `json:"image_base64,omitempty"` // base64.
+
+	ElementTree []UIElement `json:"element_tree,omitempty"`
+}
+
+type Point struct {
+	X float64 `json:"x"`
+	Y float64 `json:"y"`
+}
+
+// NotificationRequest defines the incoming JSON structure.
+type NotificationRequest struct {
+	Type        string `json:"type"` // "critical", "agent_request", or "general"
+	Title       string `json:"title"`
+	Body        string `json:"body"`
+	Description string `json:"description,omitempty"`
+	Source      string `json:"source,omitempty"`
+	// Device Routing
+	TargetTokens []string `json:"target_tokens"`
+	TargetToken  string   `json:"target_token,omitempty"`
+	// Critical / Pager specific fields
+	IncidentID          string `json:"incident_id,omitempty"`
+	Severity            string `json:"severity,omitempty"`
+	Tier                int    `json:"tier,omitempty"`
+	AutoEscalateSeconds int    `json:"auto_escalate_seconds,omitempty"`
+	// Agent Request specific fields
+	ExecutionID string `json:"execution_id,omitempty"`
+	WorkflowID  string `json:"workflow_id,omitempty"`
+	Action      string `json:"action,omitempty"`
+	// General / FYI specific fields
+	ReferenceURL string `json:"reference_url,omitempty"`
+}

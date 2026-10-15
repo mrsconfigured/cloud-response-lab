@@ -1,0 +1,199 @@
+{
+  "actions": [
+    {
+      "app_id": "ccf48f29-1418-4e18-82cb-0f1aed55586d",
+      "app_name": "Shuffle Tools",
+      "app_version": "1.2.0",
+      "authentication_id": "",
+      "category": "",
+      "category_label": null,
+      "environment": "Shuffle",
+      "execution_delay": 0,
+      "execution_variable": {
+        "id": "",
+        "name": "",
+        "value": ""
+      },
+      "generated": false,
+      "id": "46b36b47-7c5f-5a88-b35e-73960bdc25b2",
+      "isStartNode": true,
+      "is_valid": true,
+      "label": "validate",
+      "name": "repeat_back_to_me",
+      "parameters": [
+        {
+          "action_field": "",
+          "custom_value": false,
+          "error": "",
+          "hidden": false,
+          "id": "",
+          "multiselect": false,
+          "name": "call",
+          "skip_multicheck": false,
+          "unique_toggled": false,
+          "value": "{\"check\": \"runs only after human approval\", \"exec\": \"$exec\", \"mode\": \"dry_run\", \"playbook\": \"reset-mfa\", \"version\": \"1.0.0\"}",
+          "value_replace": null,
+          "variant": "STATIC_VALUE"
+        }
+      ],
+      "parent_controlled": false,
+      "position": {
+        "x": 100.001,
+        "y": 100.001
+      },
+      "public": true,
+      "reference_url": "",
+      "run_magic_input": false,
+      "run_magic_output": false,
+      "sharing": true,
+      "source_execution": "",
+      "source_workflow": "",
+      "sub_action": false,
+      "suggestion": false
+    },
+    {
+      "app_id": "ccf48f29-1418-4e18-82cb-0f1aed55586d",
+      "app_name": "Shuffle Tools",
+      "app_version": "1.2.0",
+      "authentication_id": "",
+      "category": "",
+      "category_label": null,
+      "environment": "Shuffle",
+      "execution_delay": 0,
+      "execution_variable": {
+        "id": "",
+        "name": "",
+        "value": ""
+      },
+      "generated": false,
+      "id": "8d36ad57-beb7-5b19-8614-ca31db629e0d",
+      "is_valid": true,
+      "label": "plan",
+      "name": "repeat_back_to_me",
+      "parameters": [
+        {
+          "action_field": "",
+          "custom_value": false,
+          "error": "",
+          "hidden": false,
+          "id": "",
+          "multiselect": false,
+          "name": "call",
+          "skip_multicheck": false,
+          "unique_toggled": false,
+          "value": "{\"playbook\": \"reset-mfa\", \"steps\": [{\"action\": \"graph:GET /users/{id}/authentication/methods\", \"id\": \"list_auth_methods\", \"simulated\": true}, {\"action\": \"graph:DELETE /users/{id}/authentication/methods/{methodId}\", \"id\": \"remove_auth_methods\", \"simulated\": true}], \"target\": \"$exec.target\"}",
+          "value_replace": null,
+          "variant": "STATIC_VALUE"
+        }
+      ],
+      "parent_controlled": false,
+      "position": {
+        "x": 400.001,
+        "y": 100.001
+      },
+      "public": true,
+      "reference_url": "",
+      "run_magic_input": false,
+      "run_magic_output": false,
+      "sharing": true,
+      "source_execution": "",
+      "source_workflow": "",
+      "sub_action": false,
+      "suggestion": false
+    },
+    {
+      "app_id": "ccf48f29-1418-4e18-82cb-0f1aed55586d",
+      "app_name": "Shuffle Tools",
+      "app_version": "1.2.0",
+      "authentication_id": "",
+      "category": "",
+      "category_label": null,
+      "environment": "Shuffle",
+      "execution_delay": 0,
+      "execution_variable": {
+        "id": "",
+        "name": "",
+        "value": ""
+      },
+      "generated": false,
+      "id": "811f3ccf-5e81-59ab-913f-07d9133459de",
+      "is_valid": true,
+      "label": "record",
+      "name": "repeat_back_to_me",
+      "parameters": [
+        {
+          "action_field": "",
+          "custom_value": false,
+          "error": "",
+          "hidden": false,
+          "id": "",
+          "multiselect": false,
+          "name": "call",
+          "skip_multicheck": false,
+          "unique_toggled": false,
+          "value": "{\"changes_made\": false, \"mode\": \"dry_run\", \"playbook\": \"reset-mfa\", \"result\": \"simulated\", \"steps\": [\"list_auth_methods\", \"remove_auth_methods\"]}",
+          "value_replace": null,
+          "variant": "STATIC_VALUE"
+        }
+      ],
+      "parent_controlled": false,
+      "position": {
+        "x": 700.001,
+        "y": 100.001
+      },
+      "public": true,
+      "reference_url": "",
+      "run_magic_input": false,
+      "run_magic_output": false,
+      "sharing": true,
+      "source_execution": "",
+      "source_workflow": "",
+      "sub_action": false,
+      "suggestion": false
+    }
+  ],
+  "branches": [
+    {
+      "conditions": [],
+      "decorator": false,
+      "destination_id": "8d36ad57-beb7-5b19-8614-ca31db629e0d",
+      "has_errors": false,
+      "id": "2d4ed5c5-27fc-5e9d-b03c-c11501d0f6dd",
+      "label": "then",
+      "parent_controlled": false,
+      "source_id": "46b36b47-7c5f-5a88-b35e-73960bdc25b2",
+      "source_parent": ""
+    },
+    {
+      "conditions": [],
+      "decorator": false,
+      "destination_id": "811f3ccf-5e81-59ab-913f-07d9133459de",
+      "has_errors": false,
+      "id": "fd330cef-4c1d-5218-871b-ca0cf54037ad",
+      "label": "then",
+      "parent_controlled": false,
+      "source_id": "8d36ad57-beb7-5b19-8614-ca31db629e0d",
+      "source_parent": ""
+    }
+  ],
+  "configuration": {
+    "exit_on_error": false,
+    "skip_notifications": true,
+    "start_from_top": true
+  },
+  "default_return_value": "",
+  "description": "Reset MFA registration (dry-run). Dry-run only: every node echoes a record and changes nothing.",
+  "id": "909c5ba7-0106-5aa2-b67a-802e1b049801",
+  "input_questions": null,
+  "name": "lab/entra/reset-mfa@1.0.0",
+  "public": false,
+  "sharing": "private",
+  "start": "46b36b47-7c5f-5a88-b35e-73960bdc25b2",
+  "tags": [
+    "lab",
+    "dry-run",
+    "entra"
+  ],
+  "triggers": [],
+  "workflow_variables": []
+}

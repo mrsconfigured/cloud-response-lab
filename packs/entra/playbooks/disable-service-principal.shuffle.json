@@ -1,0 +1,199 @@
+{
+  "actions": [
+    {
+      "app_id": "ccf48f29-1418-4e18-82cb-0f1aed55586d",
+      "app_name": "Shuffle Tools",
+      "app_version": "1.2.0",
+      "authentication_id": "",
+      "category": "",
+      "category_label": null,
+      "environment": "Shuffle",
+      "execution_delay": 0,
+      "execution_variable": {
+        "id": "",
+        "name": "",
+        "value": ""
+      },
+      "generated": false,
+      "id": "f74a7e29-20d3-509a-960e-d55f2cc2d42f",
+      "isStartNode": true,
+      "is_valid": true,
+      "label": "validate",
+      "name": "repeat_back_to_me",
+      "parameters": [
+        {
+          "action_field": "",
+          "custom_value": false,
+          "error": "",
+          "hidden": false,
+          "id": "",
+          "multiselect": false,
+          "name": "call",
+          "skip_multicheck": false,
+          "unique_toggled": false,
+          "value": "{\"check\": \"runs only after human approval\", \"exec\": \"$exec\", \"mode\": \"dry_run\", \"playbook\": \"disable-service-principal\", \"version\": \"1.0.0\"}",
+          "value_replace": null,
+          "variant": "STATIC_VALUE"
+        }
+      ],
+      "parent_controlled": false,
+      "position": {
+        "x": 100.001,
+        "y": 100.001
+      },
+      "public": true,
+      "reference_url": "",
+      "run_magic_input": false,
+      "run_magic_output": false,
+      "sharing": true,
+      "source_execution": "",
+      "source_workflow": "",
+      "sub_action": false,
+      "suggestion": false
+    },
+    {
+      "app_id": "ccf48f29-1418-4e18-82cb-0f1aed55586d",
+      "app_name": "Shuffle Tools",
+      "app_version": "1.2.0",
+      "authentication_id": "",
+      "category": "",
+      "category_label": null,
+      "environment": "Shuffle",
+      "execution_delay": 0,
+      "execution_variable": {
+        "id": "",
+        "name": "",
+        "value": ""
+      },
+      "generated": false,
+      "id": "a483c5b5-780c-5ca6-8040-64306b43713b",
+      "is_valid": true,
+      "label": "plan",
+      "name": "repeat_back_to_me",
+      "parameters": [
+        {
+          "action_field": "",
+          "custom_value": false,
+          "error": "",
+          "hidden": false,
+          "id": "",
+          "multiselect": false,
+          "name": "call",
+          "skip_multicheck": false,
+          "unique_toggled": false,
+          "value": "{\"playbook\": \"disable-service-principal\", \"steps\": [{\"action\": \"graph:PATCH /servicePrincipals/{id}\", \"id\": \"disable_service_principal\", \"simulated\": true}], \"target\": \"$exec.target\"}",
+          "value_replace": null,
+          "variant": "STATIC_VALUE"
+        }
+      ],
+      "parent_controlled": false,
+      "position": {
+        "x": 400.001,
+        "y": 100.001
+      },
+      "public": true,
+      "reference_url": "",
+      "run_magic_input": false,
+      "run_magic_output": false,
+      "sharing": true,
+      "source_execution": "",
+      "source_workflow": "",
+      "sub_action": false,
+      "suggestion": false
+    },
+    {
+      "app_id": "ccf48f29-1418-4e18-82cb-0f1aed55586d",
+      "app_name": "Shuffle Tools",
+      "app_version": "1.2.0",
+      "authentication_id": "",
+      "category": "",
+      "category_label": null,
+      "environment": "Shuffle",
+      "execution_delay": 0,
+      "execution_variable": {
+        "id": "",
+        "name": "",
+        "value": ""
+      },
+      "generated": false,
+      "id": "79ec8252-e7ff-55aa-b5e5-c294f308c505",
+      "is_valid": true,
+      "label": "record",
+      "name": "repeat_back_to_me",
+      "parameters": [
+        {
+          "action_field": "",
+          "custom_value": false,
+          "error": "",
+          "hidden": false,
+          "id": "",
+          "multiselect": false,
+          "name": "call",
+          "skip_multicheck": false,
+          "unique_toggled": false,
+          "value": "{\"changes_made\": false, \"mode\": \"dry_run\", \"playbook\": \"disable-service-principal\", \"result\": \"simulated\", \"steps\": [\"disable_service_principal\"]}",
+          "value_replace": null,
+          "variant": "STATIC_VALUE"
+        }
+      ],
+      "parent_controlled": false,
+      "position": {
+        "x": 700.001,
+        "y": 100.001
+      },
+      "public": true,
+      "reference_url": "",
+      "run_magic_input": false,
+      "run_magic_output": false,
+      "sharing": true,
+      "source_execution": "",
+      "source_workflow": "",
+      "sub_action": false,
+      "suggestion": false
+    }
+  ],
+  "branches": [
+    {
+      "conditions": [],
+      "decorator": false,
+      "destination_id": "a483c5b5-780c-5ca6-8040-64306b43713b",
+      "has_errors": false,
+      "id": "166a218d-577e-54dd-a5c7-e0daa22e455f",
+      "label": "then",
+      "parent_controlled": false,
+      "source_id": "f74a7e29-20d3-509a-960e-d55f2cc2d42f",
+      "source_parent": ""
+    },
+    {
+      "conditions": [],
+      "decorator": false,
+      "destination_id": "79ec8252-e7ff-55aa-b5e5-c294f308c505",
+      "has_errors": false,
+      "id": "9e020d05-7435-53f0-b705-f7ba8c819bc0",
+      "label": "then",
+      "parent_controlled": false,
+      "source_id": "a483c5b5-780c-5ca6-8040-64306b43713b",
+      "source_parent": ""
+    }
+  ],
+  "configuration": {
+    "exit_on_error": false,
+    "skip_notifications": true,
+    "start_from_top": true
+  },
+  "default_return_value": "",
+  "description": "Disable service principal (dry-run). Dry-run only: every node echoes a record and changes nothing.",
+  "id": "d9faeec0-2b6d-5777-982a-76918a4846ab",
+  "input_questions": null,
+  "name": "lab/entra/disable-service-principal@1.0.0",
+  "public": false,
+  "sharing": "private",
+  "start": "f74a7e29-20d3-509a-960e-d55f2cc2d42f",
+  "tags": [
+    "lab",
+    "dry-run",
+    "entra"
+  ],
+  "triggers": [],
+  "workflow_variables": []
+}

@@ -1,0 +1,19 @@
+title: "Entra Account Locked After Repeated Failed Sign-ins"
+id: 8a7d441b-870b-4fce-bac4-00000000000d
+status: experimental
+description: "Sign-in blocked because the account is locked by smart lockout (error 50053), a proxy for password guessing. FIXTURE ONLY: sign-in logs need Entra ID P1 or P2."
+author: 1xLoZec
+date: 2026-10-14
+tags:
+  - attack.credential-access
+  - attack.t1110
+logsource:
+  product: azure
+  service: signinlogs
+detection:
+  selection:
+    status.errorCode: "50053"
+  condition: selection
+falsepositives:
+  - "A user who forgot a password; check source diversity."
+level: medium

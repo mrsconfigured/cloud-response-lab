@@ -1,0 +1,98 @@
+{
+  "positive": [
+    {
+      "name": "DeleteTrail",
+      "event": {
+        "eventVersion": "1.11",
+        "eventTime": "2026-10-14T19:32:04Z",
+        "awsRegion": "us-east-1",
+        "sourceIPAddress": "203.0.113.10",
+        "userAgent": "lab-test-agent",
+        "recipientAccountId": "111111111111",
+        "readOnly": false,
+        "managementEvent": true,
+        "eventType": "AwsApiCall",
+        "eventID": "00000000-0000-4000-8000-000000000010",
+        "userIdentity": {
+          "type": "IAMUser",
+          "userName": "lab-operator",
+          "accountId": "111111111111"
+        },
+        "eventSource": "cloudtrail.amazonaws.com",
+        "eventName": "DeleteTrail",
+        "requestParameters": {
+          "name": "example-trail"
+        }
+      }
+    }
+  ],
+  "negative": [
+    {
+      "name": "neighbour: DescribeTrails",
+      "event": {
+        "eventVersion": "1.11",
+        "eventTime": "2026-10-14T19:32:04Z",
+        "awsRegion": "us-east-1",
+        "sourceIPAddress": "203.0.113.10",
+        "userAgent": "lab-test-agent",
+        "recipientAccountId": "111111111111",
+        "readOnly": true,
+        "managementEvent": true,
+        "eventType": "AwsApiCall",
+        "eventID": "00000000-0000-4000-8000-000000000011",
+        "userIdentity": {
+          "type": "IAMUser",
+          "userName": "lab-operator",
+          "accountId": "111111111111"
+        },
+        "eventSource": "cloudtrail.amazonaws.com",
+        "eventName": "DescribeTrails"
+      }
+    },
+    {
+      "name": "denied DeleteTrail",
+      "event": {
+        "eventVersion": "1.11",
+        "eventTime": "2026-10-14T19:32:04Z",
+        "awsRegion": "us-east-1",
+        "sourceIPAddress": "203.0.113.10",
+        "userAgent": "lab-test-agent",
+        "recipientAccountId": "111111111111",
+        "readOnly": false,
+        "managementEvent": true,
+        "eventType": "AwsApiCall",
+        "eventID": "00000000-0000-4000-8000-000000000012",
+        "userIdentity": {
+          "type": "IAMUser",
+          "userName": "lab-operator",
+          "accountId": "111111111111"
+        },
+        "eventSource": "cloudtrail.amazonaws.com",
+        "eventName": "DeleteTrail",
+        "errorCode": "AccessDenied"
+      }
+    },
+    {
+      "name": "same name, other service",
+      "event": {
+        "eventVersion": "1.11",
+        "eventTime": "2026-10-14T19:32:04Z",
+        "awsRegion": "us-east-1",
+        "sourceIPAddress": "203.0.113.10",
+        "userAgent": "lab-test-agent",
+        "recipientAccountId": "111111111111",
+        "readOnly": false,
+        "managementEvent": true,
+        "eventType": "AwsApiCall",
+        "eventID": "00000000-0000-4000-8000-000000000013",
+        "userIdentity": {
+          "type": "IAMUser",
+          "userName": "lab-operator",
+          "accountId": "111111111111"
+        },
+        "eventSource": "s3.amazonaws.com",
+        "eventName": "DeleteTrail"
+      }
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "status": "documentation-only-no-execution",
+  "stratus_release": "v2.37.0",
+  "techniques": [
+    {
+      "id": "aws.defense-evasion.cloudtrail-stop",
+      "rule": "aws-cloudtrail-stop",
+      "event": "StopLogging",
+      "risk": "Stops a lab trail; warm-up creates resources and may incur log/storage cost."
+    },
+    {
+      "id": "aws.persistence.iam-create-admin-user",
+      "rule": "aws-admin-policy",
+      "event": "AttachUserPolicy",
+      "risk": "Creates privileged IAM user and access key; cleanup/secret handling mandatory, not automated here."
+    }
+  ]
+}

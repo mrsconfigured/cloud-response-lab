@@ -1,0 +1,88 @@
+{
+  "id": "5bfb94d7-0c1e-5f80-bd11-db386b9bbaf1",
+  "name": "STAGED Owner A + Owner B: aws-admin-policy",
+  "description": "Upstream-native field layout; app binding/import/execution unverified. Static human-review instructions ONLY; does not implement validation or deduplication.",
+  "is_valid": false,
+  "public": false,
+  "owner": "",
+  "start": "f67308a8-d55b-5145-ae87-a7a0a26020e0",
+  "actions": [
+    {
+      "id": "f67308a8-d55b-5145-ae87-a7a0a26020e0",
+      "app_name": "Shuffle Tools",
+      "app_version": "1.2.0",
+      "app_id": "",
+      "name": "repeat_back_to_me",
+      "label": "staged_notice",
+      "description": "Static no-op, not live alert triage",
+      "is_valid": false,
+      "isStartNode": true,
+      "authentication_id": "",
+      "environment": "Shuffle",
+      "public": false,
+      "position": {
+        "x": 100,
+        "y": 100
+      },
+      "parameters": [
+        {
+          "name": "call",
+          "variant": "STATIC_VALUE",
+          "value": "{\"mode\": \"dry_run\", \"status\": \"human_review_required\", \"rule_id\": \"965a1068-c2bf-4ea5-b1d0-000000000002\", \"owner\": \"Owner B\", \"actions\": [], \"summary\": \"Verify sandbox identity, change authorization and original CloudTrail event. Never disable users or keys automatically.\"}",
+          "required": true,
+          "configuration": false
+        }
+      ]
+    },
+    {
+      "id": "78c3b2bd-a1f6-5abe-ae19-a1ec91ee20ab",
+      "app_name": "Shuffle Tools",
+      "app_version": "1.2.0",
+      "app_id": "",
+      "name": "repeat_back_to_me",
+      "label": "human_review_required",
+      "description": "Static no-op, not live alert triage",
+      "is_valid": false,
+      "isStartNode": false,
+      "authentication_id": "",
+      "environment": "Shuffle",
+      "public": false,
+      "position": {
+        "x": 400,
+        "y": 100
+      },
+      "parameters": [
+        {
+          "name": "call",
+          "variant": "STATIC_VALUE",
+          "value": "{\"mode\": \"dry_run\", \"status\": \"human_review_required\", \"rule_id\": \"965a1068-c2bf-4ea5-b1d0-000000000002\", \"owner\": \"Owner B\", \"actions\": [], \"summary\": \"Verify sandbox identity, change authorization and original CloudTrail event. Never disable users or keys automatically.\"}",
+          "required": true,
+          "configuration": false
+        }
+      ]
+    }
+  ],
+  "branches": [
+    {
+      "id": "9239d816-2770-54d3-aea9-1f6ef7272e07",
+      "source_id": "f67308a8-d55b-5145-ae87-a7a0a26020e0",
+      "destination_id": "78c3b2bd-a1f6-5abe-ae19-a1ec91ee20ab",
+      "label": "manual review only",
+      "conditions": []
+    }
+  ],
+  "triggers": [],
+  "workflow_variables": [],
+  "execution_variables": [],
+  "configuration": {
+    "exit_on_error": true,
+    "start_from_top": true,
+    "skip_notifications": true
+  },
+  "tags": [
+    "experimental",
+    "dry-run",
+    "Owner B"
+  ],
+  "example_argument": "{}"
+}

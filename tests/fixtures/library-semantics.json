@@ -1,0 +1,101 @@
+{
+  "aws-cloudtrail-stop": {
+    "provider": "aws",
+    "selection": {
+      "eventSource": "cloudtrail.amazonaws.com",
+      "eventName": "StopLogging"
+    }
+  },
+  "aws-cloudtrail-delete": {
+    "provider": "aws",
+    "selection": {
+      "eventSource": "cloudtrail.amazonaws.com",
+      "eventName": "DeleteTrail"
+    }
+  },
+  "aws-access-key-create": {
+    "provider": "aws",
+    "selection": {
+      "eventSource": "iam.amazonaws.com",
+      "eventName": "CreateAccessKey"
+    }
+  },
+  "aws-console-no-mfa": {
+    "provider": "aws",
+    "selection": {
+      "eventSource": "signin.amazonaws.com",
+      "eventName": "ConsoleLogin",
+      "responseElements.ConsoleLogin": "Success",
+      "additionalEventData.MFAUsed": "No"
+    }
+  },
+  "entra-role-member": {
+    "provider": "entra",
+    "selection": {
+      "category": "RoleManagement",
+      "activityDisplayName": "Add member to role",
+      "loggedByService": "Core Directory",
+      "result": "success"
+    }
+  },
+  "entra-app-credential": {
+    "provider": "entra",
+    "selection": {
+      "category": "ApplicationManagement",
+      "activityDisplayName": "Add service principal credentials",
+      "loggedByService": "Core Directory",
+      "result": "success"
+    }
+  },
+  "entra-conditional-access-delete": {
+    "provider": "entra",
+    "selection": {
+      "category": "Policy",
+      "activityDisplayName": "Delete conditional access policy",
+      "loggedByService": "Core Directory",
+      "result": "success"
+    }
+  },
+  "aws-admin-attachment": {
+    "provider": "aws",
+    "selection": {
+      "eventSource": "iam.amazonaws.com",
+      "eventName": [
+        "AttachUserPolicy",
+        "AttachRolePolicy",
+        "AttachGroupPolicy"
+      ],
+      "requestParameters.policyArn": "arn:aws:iam::aws:policy/AdministratorAccess"
+    }
+  },
+  "entra-app-role-assignment": {
+    "provider": "entra",
+    "selection": {
+      "category": "ApplicationManagement",
+      "activityDisplayName": "Add app role assignment to service principal",
+      "loggedByService": "Core Directory",
+      "result": "success"
+    }
+  },
+  "entra-consent-granted": {
+    "provider": "entra",
+    "selection": {
+      "category": "ApplicationManagement",
+      "activityDisplayName": [
+        "Consent to application",
+        "Add delegated permission grant"
+      ],
+      "loggedByService": "Core Directory",
+      "result": "success"
+    }
+  },
+  "entra-user-created": {
+    "provider": "entra",
+    "selection": {
+      "category": "UserManagement",
+      "activityDisplayName": "Add user",
+      "loggedByService": "Core Directory",
+      "result": "success"
+    }
+  }
+}

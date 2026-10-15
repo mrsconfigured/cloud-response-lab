@@ -1,0 +1,20 @@
+{
+  "compiler": "pySigma",
+  "version": "1.5.1",
+  "backend_version": "2.1.1",
+  "test_engine": "bounded pySigma parsed AST; NOT Elasticsearch",
+  "rule_count": 11,
+  "source_sha256": {
+    "aws-access-key-create.yml": "726c7dec98e306e764054897d2c8cdc26872e7b38971a749bc7d2f295a4e40db",
+    "aws-admin-attachment.yml": "4469619b8f10f6f1905f6d2e7274ecd7f8cff51d62a1ef29b15f16508ad2872a",
+    "aws-cloudtrail-delete.yml": "3a755611a0026387f7fbb71913bdecda2d5a42daa8a954726f62f46db33042ab",
+    "aws-cloudtrail-stop.yml": "19b0ff6f5226e43cc796b7afa5262b6d320d108d89639b1881e0bf0f29c26e49",
+    "aws-console-no-mfa.yml": "a4d9772e12e207e74f6b8cfe4b5d994322fcc0b0206910b3340a16d12b815592",
+    "entra-app-credential.yml": "9419cd7a629ba8d90545bbfa53e11a2f8015c61c8a2555246b909c89cfac70f9",
+    "entra-app-role-assignment.yml": "7f694ccaa91896300ce8ae304034d88dd171cdee2e2be378d3e4088abb0d03fb",
+    "entra-conditional-access-delete.yml": "7710c6fab2c5df67f6e62e58d27a28dd010ace6b473baba23331ac4dc8d7900a",
+    "entra-consent-granted.yml": "2c3bbebab4e879838df4816ed982f862a594be119ca7c6af4fac54fb8e9b9336",
+    "entra-role-member.yml": "eb3d2ed84bc5de8a9858bc84bf571cfd46701d32c07961eae87291ba8e9bab1a",
+    "entra-user-created.yml": "f3acdb061740e9e2ca838dc9e7a11f1164ff86561a21a1cec1e58de0451a2d75"
+  }
+}

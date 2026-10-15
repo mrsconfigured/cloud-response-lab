@@ -1,0 +1,30 @@
+{
+  "rule_id": "965a1068-c2bf-4ea5-b1d0-000000000003",
+  "name": "Microsoft Entra role member added",
+  "description": "LOCAL STAGED: review required; successful activity only. Not a production verdict.",
+  "risk_score": 73,
+  "severity": "high",
+  "type": "query",
+  "language": "kuery",
+  "query": "lab.provider: \"entra\" AND lab.category: \"RoleManagement\" AND lab.activity: \"Add member to role\" AND lab.result: \"success\"",
+  "index": [
+    "logs-personal-lab-*"
+  ],
+  "enabled": false,
+  "interval": "5m",
+  "from": "now-6m",
+  "to": "now",
+  "actions": [],
+  "author": [
+    "Owner A"
+  ],
+  "tags": [
+    "experimental",
+    "offline-parity-unverified"
+  ],
+  "false_positives": [
+    "Authorized lab administration; triage change authorization before escalation."
+  ],
+  "version": 1,
+  "note": "Owner B reviews every response. No automatic response or external connector."
+}

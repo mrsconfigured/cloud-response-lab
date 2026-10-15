@@ -1,0 +1,7 @@
+{
+  "query": {
+    "query_string": {
+      "query": "(eventSource:iam.amazonaws.com AND (eventName:(AttachUserPolicy OR AttachRolePolicy OR AttachGroupPolicy)) AND requestParameters.policyArn:arn\\:aws\\:iam\\:\\:aws\\:policy\\/AdministratorAccess) AND (NOT _exists_:errorCode)"
+    }
+  }
+}

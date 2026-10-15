@@ -1,0 +1,68 @@
+{
+  "schema_version": 1,
+  "id": "disable-service-principal",
+  "version": "1.0.0",
+  "pack": "entra",
+  "owner_lane": "response",
+  "title": "Disable service principal (dry-run)",
+  "trigger": {
+    "rule_ids": [
+      "8a7d441b-870b-4fce-bac4-000000000006",
+      "8a7d441b-870b-4fce-bac4-000000000008",
+      "8a7d441b-870b-4fce-bac4-000000000009"
+    ],
+    "event": {
+      "all_of": [
+        {
+          "path": "result",
+          "equals": "success"
+        },
+        {
+          "path": "targetResources.0.type",
+          "in": [
+            "ServicePrincipal",
+            "Application"
+          ]
+        }
+      ],
+      "none_of": []
+    }
+  },
+  "benign": {
+    "any_of": []
+  },
+  "protected_targets": [],
+  "target": {
+    "path": "targetResources.0.displayName",
+    "label": "service principal"
+  },
+  "approval": {
+    "required": true,
+    "approver_roles": [
+      "detection-owner",
+      "response-owner"
+    ],
+    "prompt": "Will set accountEnabled=false on service principal {target}, which stops it from signing in."
+  },
+  "steps": [
+    {
+      "id": "disable_service_principal",
+      "action": "graph:PATCH /servicePrincipals/{id}",
+      "params": {
+        "principal": "{target}",
+        "accountEnabled": "false"
+      }
+    }
+  ],
+  "mode": "dry_run",
+  "live": {
+    "supported": false,
+    "required_permissions": [
+      "Application.ReadWrite.All"
+    ],
+    "note": "The Azure app holds read-only Graph scopes (AuditLog.Read.All, Directory.Read.All)."
+  },
+  "audit": {
+    "index": "lab-response-audit"
+  }
+}

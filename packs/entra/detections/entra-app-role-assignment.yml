@@ -1,0 +1,22 @@
+title: "Entra App Role Assigned To Service Principal"
+id: 8a7d441b-870b-4fce-bac4-000000000008
+status: experimental
+description: "Successful app role assignment to a service principal in directory audit logs. Behavioral signal for privilege escalation through an application identity, not proof of malicious intent."
+author: 1xLoZec
+date: 2026-10-14
+tags:
+  - attack.privilege-escalation
+  - attack.t1098.003
+logsource:
+  product: azure
+  service: auditlogs
+detection:
+  selection:
+    category: "ApplicationManagement"
+    activityDisplayName: "Add app role assignment to service principal"
+    loggedByService: "Core Directory"
+    result: "success"
+  condition: selection
+falsepositives:
+  - "App registration and admin-consent setup by a platform owner; confirm the actor and ticket."
+level: medium

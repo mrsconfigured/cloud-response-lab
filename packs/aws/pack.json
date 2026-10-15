@@ -1,0 +1,54 @@
+{
+  "name": "aws",
+  "provider": "aws",
+  "lane": "Detection",
+  "log_source": "AWS CloudTrail",
+  "index": "logs-cloud-response-lab-library-aws",
+  "time_field": "eventTime",
+  "id_field": "eventID",
+  "data_view": "lab-cloudtrail",
+  "fields": {
+    "actor": [
+      "userIdentity.userName",
+      "userIdentity.sessionContext.sessionIssuer.userName",
+      "userIdentity.type"
+    ],
+    "actor_type": "userIdentity.type",
+    "operation": "eventName",
+    "service": "eventSource",
+    "source_ip": "sourceIPAddress",
+    "region": "awsRegion",
+    "target": [
+      "requestParameters.userName",
+      "requestParameters.roleName",
+      "requestParameters.name"
+    ],
+    "error": "errorCode"
+  },
+  "actions": [
+    {
+      "id": "acknowledge",
+      "label": "Acknowledge",
+      "style": "secondary"
+    },
+    {
+      "id": "investigate",
+      "label": "Investigate",
+      "style": "primary"
+    },
+    {
+      "id": "contain",
+      "label": "Contain",
+      "style": "danger",
+      "playbook": "contain-iam-user"
+    }
+  ],
+  "enabled_rules": [
+    "aws-access-key-create",
+    "aws-admin-attachment",
+    "aws-cloudtrail-delete",
+    "aws-cloudtrail-stop",
+    "aws-console-no-mfa"
+  ],
+  "fixture_only": []
+}

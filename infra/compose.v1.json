@@ -1,0 +1,235 @@
+{
+  "name": "cloud-response-lab",
+  "services": {
+    "elasticsearch": {
+      "profiles": [
+        "reviewed"
+      ],
+      "restart": "no",
+      "networks": [
+        "lab"
+      ],
+      "security_opt": [
+        "no-new-privileges:true"
+      ],
+      "cap_drop": [
+        "ALL"
+      ],
+      "image": "docker.elastic.co/elasticsearch/elasticsearch@sha256:13b4a40bb095774f5fda635e45fd5677cc6a26565e42b24997b0c72b88e75984",
+      "mem_limit": "2g",
+      "environment": {
+        "discovery.type": "single-node",
+        "xpack.security.enabled": "true",
+        "xpack.security.http.ssl.enabled": "true",
+        "xpack.security.http.ssl.key": "certs/elasticsearch.key",
+        "xpack.security.http.ssl.certificate": "certs/elasticsearch.crt",
+        "xpack.security.http.ssl.certificate_authorities": "certs/ca.crt",
+        "ELASTIC_PASSWORD_FILE": "/run/secrets/elastic_password",
+        "ES_JAVA_OPTS": "-Xms1g -Xmx1g"
+      },
+      "volumes": [
+        "elastic-v1:/usr/share/elasticsearch/data",
+        {
+          "type": "bind",
+          "source": "./secrets/v1/elastic_password",
+          "target": "/run/secrets/elastic_password",
+          "read_only": true,
+          "bind": {
+            "create_host_path": false
+          }
+        },
+        {
+          "type": "bind",
+          "source": "./secrets/v1/certs/ca.crt",
+          "target": "/usr/share/elasticsearch/config/certs/ca.crt",
+          "read_only": true,
+          "bind": {
+            "create_host_path": false
+          }
+        },
+        {
+          "type": "bind",
+          "source": "./secrets/v1/certs/elasticsearch.crt",
+          "target": "/usr/share/elasticsearch/config/certs/elasticsearch.crt",
+          "read_only": true,
+          "bind": {
+            "create_host_path": false
+          }
+        },
+        {
+          "type": "bind",
+          "source": "./secrets/v1/certs/elasticsearch.key",
+          "target": "/usr/share/elasticsearch/config/certs/elasticsearch.key",
+          "read_only": true,
+          "bind": {
+            "create_host_path": false
+          }
+        }
+      ]
+    },
+    "kibana": {
+      "profiles": [
+        "reviewed"
+      ],
+      "restart": "no",
+      "networks": [
+        "lab"
+      ],
+      "security_opt": [
+        "no-new-privileges:true"
+      ],
+      "cap_drop": [
+        "ALL"
+      ],
+      "image": "docker.elastic.co/kibana/kibana@sha256:13b72ce7222c36e4213229004ae62a87aeb32fd372ebfa6fb38f7a3285fdbb78",
+      "mem_limit": "1536m",
+      "volumes": [
+        {
+          "type": "bind",
+          "source": "./secrets/v1/kibana.yml",
+          "target": "/usr/share/kibana/config/kibana.yml",
+          "read_only": true,
+          "bind": {
+            "create_host_path": false
+          }
+        },
+        {
+          "type": "bind",
+          "source": "./secrets/v1/certs/ca.crt",
+          "target": "/usr/share/kibana/config/certs/ca.crt",
+          "read_only": true,
+          "bind": {
+            "create_host_path": false
+          }
+        },
+        {
+          "type": "bind",
+          "source": "./secrets/v1/certs/kibana.crt",
+          "target": "/usr/share/kibana/config/certs/kibana.crt",
+          "read_only": true,
+          "bind": {
+            "create_host_path": false
+          }
+        },
+        {
+          "type": "bind",
+          "source": "./secrets/v1/certs/kibana.key",
+          "target": "/usr/share/kibana/config/certs/kibana.key",
+          "read_only": true,
+          "bind": {
+            "create_host_path": false
+          }
+        }
+      ]
+    },
+    "response": {
+      "profiles": [
+        "reviewed"
+      ],
+      "restart": "no",
+      "networks": [
+        "lab"
+      ],
+      "security_opt": [
+        "no-new-privileges:true"
+      ],
+      "cap_drop": [
+        "ALL"
+      ],
+      "build": {
+        "context": "..",
+        "dockerfile": "response/v1/Dockerfile"
+      },
+      "mem_limit": "128m",
+      "read_only": true,
+      "tmpfs": [
+        "/tmp"
+      ],
+      "environment": {
+        "RESPONSE_BIND": "0.0.0.0",
+        "RESPONSE_TOKEN_FILE": "/run/secrets/response_token",
+        "RESPONSE_DATABASE": "/state/responses.sqlite",
+        "RESPONSE_CERT": "/certs/response.crt",
+        "RESPONSE_KEY": "/certs/response.key"
+      },
+      "volumes": [
+        {
+          "type": "bind",
+          "source": "./secrets/v1/response_token",
+          "target": "/run/secrets/response_token",
+          "read_only": true,
+          "bind": {
+            "create_host_path": false
+          }
+        },
+        "response-v1:/state",
+        {
+          "type": "bind",
+          "source": "./secrets/v1/certs/ca.crt",
+          "target": "/certs/ca.crt",
+          "read_only": true,
+          "bind": {
+            "create_host_path": false
+          }
+        },
+        {
+          "type": "bind",
+          "source": "./secrets/v1/certs/response.crt",
+          "target": "/certs/response.crt",
+          "read_only": true,
+          "bind": {
+            "create_host_path": false
+          }
+        },
+        {
+          "type": "bind",
+          "source": "./secrets/v1/certs/response.key",
+          "target": "/certs/response.key",
+          "read_only": true,
+          "bind": {
+            "create_host_path": false
+          }
+        }
+      ]
+    },
+    "response-init": {
+      "profiles": [
+        "reviewed"
+      ],
+      "restart": "no",
+      "networks": [
+        "lab"
+      ],
+      "security_opt": [
+        "no-new-privileges:true"
+      ],
+      "cap_drop": [
+        "ALL"
+      ],
+      "image": "docker.io/library/python:3.12-slim@sha256:a6e34c598f2467ed0e9a8d349809fcd8b5c603269512df273a0bb1784edc11b1",
+      "user": "0:0",
+      "mem_limit": "64m",
+      "volumes": [
+        "response-v1:/state"
+      ],
+      "command": [
+        "python",
+        "-c",
+        "import os; os.chown(\"/state\",1000,1000); os.chmod(\"/state\",0o700)"
+      ],
+      "cap_add": [
+        "CHOWN",
+        "FOWNER"
+      ]
+    }
+  },
+  "networks": {
+    "lab": {
+      "internal": true
+    }
+  },
+  "volumes": {
+    "elastic-v1": {},
+    "response-v1": {}
+  }
+}

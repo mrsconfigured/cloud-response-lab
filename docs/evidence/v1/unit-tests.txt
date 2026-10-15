@@ -1,0 +1,52 @@
+test_changes_requested_and_dismissed (test_github_adapter.GitHubAdapterTests) ... ok
+test_exception_details_never_escape (test_github_adapter.GitHubAdapterTests) ... ok
+test_failed_page_duplicate_and_draft (test_github_adapter.GitHubAdapterTests) ... ok
+test_invalid_repository_no_network (test_github_adapter.GitHubAdapterTests) ... ok
+test_no_environment_access_until_request (test_github_adapter.GitHubAdapterTests) ... ok
+test_pagination (test_github_adapter.GitHubAdapterTests) ... ok
+test_pagination_attack_and_malformed (test_github_adapter.GitHubAdapterTests) ... ok
+test_publish_gates_and_fresh_recheck (test_github_adapter.GitHubAdapterTests) ... ok
+test_read_only_and_current_head (test_github_adapter.GitHubAdapterTests) ... ok
+test_stale_head_and_stale_review (test_github_adapter.GitHubAdapterTests) ... ok
+test_transport_redirect_and_size_fail_closed (test_github_adapter.GitHubAdapterTests) ... ok
+test_elastic_export_schema_and_thirteen_fixtures (test_integrations.IntegrationTests) ... ok
+test_elastic_schema_negative_controls (test_integrations.IntegrationTests) ... ok
+test_normalization_null_empty_error_and_case (test_integrations.IntegrationTests) ... ok
+test_registry_lock_platforms_and_immutable_refs (test_integrations.IntegrationTests) ... ok
+test_registry_manifest_digest_negative_control (test_integrations.IntegrationTests) ... ok
+test_shuffle_mutations_fail (test_integrations.IntegrationTests) ... ok
+test_shuffle_upstream_field_types_and_graph (test_integrations.IntegrationTests) ... ok
+test_upstream_sources_unchanged (test_integrations.IntegrationTests) ... ok
+test_acceptance (test_lab.Detections) ... ok
+test_negative_control_mutated_rule_detected (test_lab.Detections) ... ok
+test_unsupported_sigma_fails_closed (test_lab.Detections) ... ok
+test_each_playbook_rejects_bad_alerts (test_lab.Response) ... ok
+test_each_playbook_rejects_unsafe_mutations (test_lab.Response) ... ok
+test_each_playbook_safe_and_idempotent (test_lab.Response) ... ok
+test_attack_guard (test_review_guards.Guardrails) ... ok
+test_branch_policy_negative_controls (test_review_guards.Guardrails) ... ok
+test_scope_not_substring_or_wrong_types (test_review_guards.Guardrails) ... ok
+test_positive_and_fail_closed_mutations (test_review_guards.ReviewDecision) ... ok
+test_all_bind_mounts_refuse_missing_paths (test_staging.Staging) ... ok
+test_attack_mapping_resolves_to_rules (test_staging.Staging) ... ok
+test_no_execution_capability_in_offline_engine (test_staging.Staging) ... ok
+test_bootstrap_and_bulk_wire_payloads (test_v1.V1) ... ok
+test_cloudtrail_real_shape (test_v1.V1) ... ok
+test_dashboard_references_resolve (test_v1.V1) ... ok
+test_dispatch_from_scheduled_alert (test_v1.V1) ... ok
+test_new_replay_batch_has_new_ids (test_v1.V1) ... ok
+test_openapi_operation_matches_workflow (test_v1.V1) ... ok
+test_payload_collision_rejected (test_v1.V1) ... ok
+test_persistent_replay_and_concurrency (test_v1.V1) ... ok
+test_policy_all_synthetic_cases (test_v1.V1) ... ok
+test_policy_has_no_cloud_or_network_imports (test_v1.V1) ... ok
+test_private_runtime (test_v1.V1) ... ok
+test_real_compiler_reproducible_export (test_v1.V1) ... ok
+test_runtime_clients_refuse_nonlocal_or_plaintext (test_v1.V1) ... ok
+test_safety_negative_controls (test_v1.V1) ... ok
+test_workflow_exec_argument_not_static_noop (test_v1.V1) ... ok
+
+----------------------------------------------------------------------
+Ran 47 tests in 0.071s
+
+OK

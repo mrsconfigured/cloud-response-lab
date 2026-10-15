@@ -1,0 +1,51 @@
+[
+ {
+  "_index": "logs-cloud-response-lab-library-aws",
+  "eventID": "633a461a-7734-46b1-aa5f-8b07b5f63327",
+  "eventTime": "2026-10-14T18:41:37Z",
+  "eventSource": "iam.amazonaws.com",
+  "eventName": "CreateAccessKey",
+  "awsRegion": "us-east-1",
+  "userIdentity": {
+   "type": "IAMUser"
+  },
+  "requestParameters": {
+   "userName": "[redacted]"
+  },
+  "errorCode": null,
+  "readOnly": false
+ },
+ {
+  "_index": "logs-cloud-response-lab-library-aws",
+  "eventID": "31e5b6af-013a-4fec-bb7a-6fe19f0c2658",
+  "eventTime": "2026-10-14T18:41:25Z",
+  "eventSource": "iam.amazonaws.com",
+  "eventName": "CreateAccessKey",
+  "awsRegion": "us-east-1",
+  "userIdentity": {
+   "type": "IAMUser"
+  },
+  "requestParameters": {
+   "userName": "[redacted]"
+  },
+  "errorCode": null,
+  "readOnly": false
+ },
+ {
+  "_index": "logs-cloud-response-lab-library-aws",
+  "eventID": "383a748d-b8d8-4844-8602-ce4fca0868f9",
+  "eventTime": "2026-10-14T18:41:25Z",
+  "eventSource": "iam.amazonaws.com",
+  "eventName": "AttachUserPolicy",
+  "awsRegion": "us-east-1",
+  "userIdentity": {
+   "type": "IAMUser"
+  },
+  "requestParameters": {
+   "userName": "[redacted]",
+   "policyArn": "arn:aws:iam::aws:policy/AdministratorAccess"
+  },
+  "errorCode": null,
+  "readOnly": false
+ }
+]

@@ -1,0 +1,27 @@
+{
+  "title": "Microsoft Entra role member added",
+  "id": "965a1068-c2bf-4ea5-b1d0-000000000003",
+  "status": "experimental",
+  "description": "LOCAL STAGED: review required; successful activity only. Not a production verdict.",
+  "author": "Owner A",
+  "date": "2026-10-13",
+  "logsource": {
+    "product": "azure",
+    "service": "auditlogs"
+  },
+  "detection": {
+    "selection": {
+      "category": "RoleManagement",
+      "activityDisplayName": "Add member to role",
+      "result": "success"
+    },
+    "condition": "selection"
+  },
+  "falsepositives": [
+    "Authorized lab administration; triage change authorization before escalation."
+  ],
+  "level": "high",
+  "tags": [
+    "attack.t1098"
+  ]
+}

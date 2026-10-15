@@ -1,0 +1,48 @@
+{
+  "retrieved_at": "2026-10-14T00:22:00Z",
+  "purpose": "offline schema/type evidence; unmodified upstream sources, never executed",
+  "files": [
+    {
+      "file": "rule_schemas.schema.yaml",
+      "source_url": "https://raw.githubusercontent.com/elastic/kibana/v9.5.5/x-pack/solutions/security/plugins/security_solution/common/api/detection_engine/model/rule_schema/rule_schemas.schema.yaml",
+      "sha256": "b774ed8e7c9ad3dd5b2c7c894ae230bb3e6dc5b27aa60a75f2040c34cebd49c7",
+      "bytes": 36224
+    },
+    {
+      "file": "common_attributes.schema.yaml",
+      "source_url": "https://raw.githubusercontent.com/elastic/kibana/v9.5.5/x-pack/solutions/security/plugins/security_solution/common/api/detection_engine/model/rule_schema/common_attributes.schema.yaml",
+      "sha256": "5d9b845c8cd5620a5eeeb6bf4b74c84268e4f945e936d0b2185dfac3364ac4c0",
+      "bytes": 29076
+    },
+    {
+      "file": "shuffle-structs.go",
+      "source_url": "https://raw.githubusercontent.com/Shuffle/shuffle-shared/v1.3.22/structs.go",
+      "sha256": "bcfdecbbb26c60662cbf431732224003d1de8f364a79f94369e6ae40158e5d5d",
+      "bytes": 284105
+    },
+    {
+      "file": "shuffle-tools-api.yaml",
+      "source_url": "https://raw.githubusercontent.com/Shuffle/python-apps/b2641489f3b1c486f339e414b17d54fa19346931/shuffle-tools/1.2.0/api.yaml",
+      "sha256": "707ea917c9ac94f52ba2c3a55971386e57f0d02f8bbeb19fea8bebc4ae74da50",
+      "bytes": 47700
+    },
+    {
+      "file": "elastic-LICENSE.txt",
+      "source_url": "https://raw.githubusercontent.com/elastic/kibana/v9.5.5/LICENSE.txt",
+      "sha256": "09979a6b0701e166ea7bfa4bdf524a431c7ca4a94b16ac2c645bbed9fb7ec2e1",
+      "bytes": 669
+    },
+    {
+      "file": "shuffle-shared-LICENSE",
+      "source_url": "https://raw.githubusercontent.com/Shuffle/shuffle-shared/v1.3.22/LICENSE",
+      "sha256": "8486a10c4393cee1c25392769ddd3b2d6c242d6ec7928e1414efff7dfb2f07ef",
+      "bytes": 34523
+    },
+    {
+      "file": "shuffle-apps-LICENSE",
+      "source_url": "https://raw.githubusercontent.com/Shuffle/python-apps/b2641489f3b1c486f339e414b17d54fa19346931/LICENSE",
+      "sha256": "169637a174a1a62dba7566ef39002dbbc1f6a7d2a0009a858a699c7f03d4daa1",
+      "bytes": 1069
+    }
+  ]
+}

@@ -1,0 +1,162 @@
+{
+  "name": "owner_a-owner_b-lab-staged",
+  "services": {
+    "elasticsearch": {
+      "image": "docker.elastic.co/elasticsearch/elasticsearch:9.5.5",
+      "profiles": [
+        "reviewed"
+      ],
+      "environment": {
+        "discovery.type": "single-node",
+        "xpack.security.enabled": "true",
+        "xpack.security.http.ssl.enabled": "true",
+        "xpack.security.http.ssl.key": "certs/elasticsearch.key",
+        "xpack.security.http.ssl.certificate": "certs/elasticsearch.crt",
+        "xpack.security.http.ssl.certificate_authorities": "certs/ca.crt",
+        "ELASTIC_PASSWORD_FILE": "/run/secrets/elastic_password",
+        "ES_JAVA_OPTS": "-Xms1g -Xmx1g"
+      },
+      "secrets": [
+        "elastic_password"
+      ],
+      "volumes": [
+        "elastic-data:/usr/share/elasticsearch/data",
+        {
+          "type": "bind",
+          "source": "./secrets/certs",
+          "target": "/usr/share/elasticsearch/config/certs",
+          "read_only": true,
+          "bind": {
+            "create_host_path": false
+          }
+        }
+      ],
+      "mem_limit": "2g",
+      "networks": [
+        "elastic"
+      ],
+      "restart": "no"
+    },
+    "kibana": {
+      "image": "docker.elastic.co/kibana/kibana:9.5.5",
+      "profiles": [
+        "reviewed"
+      ],
+      "ports": [
+        "127.0.0.1:5601:5601"
+      ],
+      "environment": {
+        "ELASTICSEARCH_HOSTS": "https://elasticsearch:9200",
+        "ELASTICSEARCH_SSL_CERTIFICATEAUTHORITIES": "/usr/share/kibana/config/certs/ca.crt"
+      },
+      "volumes": [
+        {
+          "type": "bind",
+          "source": "./secrets/certs",
+          "target": "/usr/share/kibana/config/certs",
+          "read_only": true,
+          "bind": {
+            "create_host_path": false
+          }
+        },
+        {
+          "type": "bind",
+          "source": "./secrets/kibana.yml",
+          "target": "/usr/share/kibana/config/kibana.yml",
+          "read_only": true,
+          "bind": {
+            "create_host_path": false
+          }
+        }
+      ],
+      "depends_on": [
+        "elasticsearch"
+      ],
+      "mem_limit": "1g",
+      "networks": [
+        "elastic"
+      ],
+      "restart": "no"
+    },
+    "shuffle-frontend": {
+      "image": "${SHUFFLE_FRONTEND_IMAGE:?STOP supply reviewed immutable image digest}",
+      "profiles": [
+        "reviewed"
+      ],
+      "ports": [
+        "127.0.0.1:3001:80"
+      ],
+      "environment": {
+        "BACKEND_HOSTNAME": "shuffle-backend"
+      },
+      "depends_on": [
+        "shuffle-backend"
+      ],
+      "mem_limit": "512m",
+      "networks": [
+        "shuffle"
+      ],
+      "restart": "no"
+    },
+    "shuffle-backend": {
+      "image": "${SHUFFLE_BACKEND_IMAGE:?STOP supply reviewed immutable image digest}",
+      "profiles": [
+        "reviewed"
+      ],
+      "hostname": "shuffle-backend",
+      "env_file": [
+        "./secrets/shuffle.env"
+      ],
+      "volumes": [
+        "shuffle-apps:/shuffle-apps",
+        "shuffle-files:/shuffle-files"
+      ],
+      "mem_limit": "1g",
+      "networks": [
+        "shuffle"
+      ],
+      "restart": "no"
+    },
+    "shuffle-opensearch": {
+      "image": "opensearchproject/opensearch:3.2.0",
+      "profiles": [
+        "reviewed"
+      ],
+      "environment": {
+        "discovery.type": "single-node",
+        "node.name": "shuffle-opensearch",
+        "cluster.name": "shuffle-cluster",
+        "node.store.allow_mmap": "false",
+        "OPENSEARCH_JAVA_OPTS": "-Xms1g -Xmx1g",
+        "OPENSEARCH_INITIAL_ADMIN_PASSWORD": "${SHUFFLE_OPENSEARCH_PASSWORD:?STOP secret required}"
+      },
+      "volumes": [
+        "shuffle-data:/usr/share/opensearch/data"
+      ],
+      "mem_limit": "2g",
+      "networks": [
+        "shuffle"
+      ],
+      "restart": "no"
+    }
+  },
+  "networks": {
+    "elastic": {
+      "internal": true
+    },
+    "shuffle": {
+      "internal": true
+    }
+  },
+  "volumes": {
+    "elastic-data": {},
+    "shuffle-apps": {},
+    "shuffle-files": {},
+    "shuffle-data": {}
+  },
+  "secrets": {
+    "elastic_password": {
+      "file": "./secrets/elastic_password"
+    }
+  }
+}

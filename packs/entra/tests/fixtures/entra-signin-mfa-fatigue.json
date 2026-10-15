@@ -1,0 +1,45 @@
+{
+  "positive": [
+    {
+      "name": "MFA prompt not answered",
+      "event": {
+        "id": "00000000-0000-4000-8000-000000000122",
+        "createdDateTime": "2026-10-14T19:32:04Z",
+        "userPrincipalName": "operator@example.invalid",
+        "ipAddress": "203.0.113.20",
+        "status": {
+          "errorCode": "500121"
+        },
+        "riskEventTypes_v2": "none"
+      }
+    }
+  ],
+  "negative": [
+    {
+      "name": "successful sign-in",
+      "event": {
+        "id": "00000000-0000-4000-8000-000000000124",
+        "createdDateTime": "2026-10-14T19:32:04Z",
+        "userPrincipalName": "operator@example.invalid",
+        "ipAddress": "203.0.113.20",
+        "status": {
+          "errorCode": "0"
+        },
+        "riskEventTypes_v2": "none"
+      }
+    },
+    {
+      "name": "wrong password (50126)",
+      "event": {
+        "id": "00000000-0000-4000-8000-000000000126",
+        "createdDateTime": "2026-10-14T19:32:04Z",
+        "userPrincipalName": "operator@example.invalid",
+        "ipAddress": "203.0.113.20",
+        "status": {
+          "errorCode": "50126"
+        },
+        "riskEventTypes_v2": "none"
+      }
+    }
+  ]
+}

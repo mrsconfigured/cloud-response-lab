@@ -1,0 +1,244 @@
+[
+  {
+    "rule_id": "8a7d441b-870b-4fce-bac4-000000000003",
+    "name": "AWS IAM Access Key Created",
+    "description": "Successful aws iam access key created; behavioral signal, not proof of malicious intent. Raw provider field contract; synthetic tests only.",
+    "type": "query",
+    "language": "lucene",
+    "query": "(eventSource:iam.amazonaws.com AND eventName:CreateAccessKey) AND (NOT _exists_:errorCode)",
+    "index": [
+      "logs-cloud-response-lab-library-aws"
+    ],
+    "enabled": true,
+    "interval": "1m",
+    "from": "now-30m",
+    "risk_score": 73,
+    "severity": "high",
+    "actions": [],
+    "tags": [
+      "attack.persistence",
+      "attack.t1098.001",
+      "lab-library"
+    ]
+  },
+  {
+    "rule_id": "965a1068-c2bf-4ea5-b1d0-000000000002",
+    "name": "Synthetic AWS IAM AdministratorAccess Policy Attachment",
+    "description": "Successful attachment of AWS managed AdministratorAccess to an IAM user, group or role. Synthetic lab only.",
+    "type": "query",
+    "language": "lucene",
+    "query": "(eventSource:iam.amazonaws.com AND (eventName:(AttachUserPolicy OR AttachRolePolicy OR AttachGroupPolicy)) AND requestParameters.policyArn:arn\\:aws\\:iam\\:\\:aws\\:policy\\/AdministratorAccess) AND (NOT _exists_:errorCode)",
+    "index": [
+      "logs-cloud-response-lab-library-aws"
+    ],
+    "enabled": true,
+    "interval": "1m",
+    "from": "now-30m",
+    "risk_score": 73,
+    "severity": "high",
+    "actions": [],
+    "tags": [
+      "attack.privilege-escalation",
+      "attack.t1098.003",
+      "lab-library"
+    ]
+  },
+  {
+    "rule_id": "8a7d441b-870b-4fce-bac4-000000000002",
+    "name": "AWS CloudTrail Trail Deleted",
+    "description": "Successful aws cloudtrail trail deleted; behavioral signal, not proof of malicious intent. Raw provider field contract; synthetic tests only.",
+    "type": "query",
+    "language": "lucene",
+    "query": "(eventSource:cloudtrail.amazonaws.com AND eventName:DeleteTrail) AND (NOT _exists_:errorCode)",
+    "index": [
+      "logs-cloud-response-lab-library-aws"
+    ],
+    "enabled": true,
+    "interval": "1m",
+    "from": "now-30m",
+    "risk_score": 73,
+    "severity": "high",
+    "actions": [],
+    "tags": [
+      "attack.defense-evasion",
+      "attack.t1562.008",
+      "lab-library"
+    ]
+  },
+  {
+    "rule_id": "8a7d441b-870b-4fce-bac4-000000000001",
+    "name": "AWS CloudTrail Logging Stopped",
+    "description": "Successful aws cloudtrail logging stopped; behavioral signal, not proof of malicious intent. Raw provider field contract; synthetic tests only.",
+    "type": "query",
+    "language": "lucene",
+    "query": "(eventSource:cloudtrail.amazonaws.com AND eventName:StopLogging) AND (NOT _exists_:errorCode)",
+    "index": [
+      "logs-cloud-response-lab-library-aws"
+    ],
+    "enabled": true,
+    "interval": "1m",
+    "from": "now-30m",
+    "risk_score": 73,
+    "severity": "high",
+    "actions": [],
+    "tags": [
+      "attack.defense-evasion",
+      "attack.t1562.008",
+      "lab-library"
+    ]
+  },
+  {
+    "rule_id": "8a7d441b-870b-4fce-bac4-000000000004",
+    "name": "AWS Successful Console Login Without MFA",
+    "description": "Successful aws successful console login without mfa; behavioral signal, not proof of malicious intent. Raw provider field contract; synthetic tests only.",
+    "type": "query",
+    "language": "lucene",
+    "query": "(eventSource:signin.amazonaws.com AND eventName:ConsoleLogin AND responseElements.ConsoleLogin:Success AND additionalEventData.MFAUsed:No) AND (NOT _exists_:errorCode)",
+    "index": [
+      "logs-cloud-response-lab-library-aws"
+    ],
+    "enabled": true,
+    "interval": "1m",
+    "from": "now-30m",
+    "risk_score": 73,
+    "severity": "high",
+    "actions": [],
+    "tags": [
+      "attack.initial-access",
+      "attack.t1078.004",
+      "lab-library"
+    ]
+  },
+  {
+    "rule_id": "8a7d441b-870b-4fce-bac4-000000000006",
+    "name": "Entra Application Credential Added",
+    "description": "Successful entra application credential added; behavioral signal, not proof of malicious intent. Raw provider field contract; synthetic tests only.",
+    "type": "query",
+    "language": "lucene",
+    "query": "category:ApplicationManagement AND activityDisplayName:\"Add service principal credentials\" AND loggedByService:\"Core Directory\" AND result:success",
+    "index": [
+      "logs-cloud-response-lab-library-entra"
+    ],
+    "enabled": true,
+    "interval": "1m",
+    "from": "now-30m",
+    "risk_score": 73,
+    "severity": "high",
+    "actions": [],
+    "tags": [
+      "attack.persistence",
+      "attack.t1098.001",
+      "lab-library"
+    ]
+  },
+  {
+    "rule_id": "8a7d441b-870b-4fce-bac4-000000000008",
+    "name": "Entra App Role Assigned To Service Principal",
+    "description": "Successful app role assignment to a service principal in directory audit logs. Behavioral signal for privilege escalation through an application identity, not proof of malicious intent.",
+    "type": "query",
+    "language": "lucene",
+    "query": "category:ApplicationManagement AND activityDisplayName:\"Add app role assignment to service principal\" AND loggedByService:\"Core Directory\" AND result:success",
+    "index": [
+      "logs-cloud-response-lab-library-entra"
+    ],
+    "enabled": true,
+    "interval": "1m",
+    "from": "now-30m",
+    "risk_score": 47,
+    "severity": "medium",
+    "actions": [],
+    "tags": [
+      "attack.privilege-escalation",
+      "attack.t1098.003",
+      "lab-library"
+    ]
+  },
+  {
+    "rule_id": "8a7d441b-870b-4fce-bac4-000000000007",
+    "name": "Entra Conditional Access Policy Deleted",
+    "description": "Successful entra conditional access policy deleted; behavioral signal, not proof of malicious intent. Raw provider field contract; synthetic tests only.",
+    "type": "query",
+    "language": "lucene",
+    "query": "category:Policy AND activityDisplayName:\"Delete conditional access policy\" AND loggedByService:\"Core Directory\" AND result:success",
+    "index": [
+      "logs-cloud-response-lab-library-entra"
+    ],
+    "enabled": true,
+    "interval": "1m",
+    "from": "now-30m",
+    "risk_score": 73,
+    "severity": "high",
+    "actions": [],
+    "tags": [
+      "attack.defense-evasion",
+      "attack.t1556.009",
+      "lab-library"
+    ]
+  },
+  {
+    "rule_id": "8a7d441b-870b-4fce-bac4-000000000009",
+    "name": "Entra Application Consent Or Delegated Permission Granted",
+    "description": "Successful user or admin consent to an application, or a delegated permission grant, in directory audit logs. Illicit consent is a known token-theft path; treat as a signal and verify the app and the permissions.",
+    "type": "query",
+    "language": "lucene",
+    "query": "category:ApplicationManagement AND (activityDisplayName:(\"Consent to application\" OR \"Add delegated permission grant\")) AND loggedByService:\"Core Directory\" AND result:success",
+    "index": [
+      "logs-cloud-response-lab-library-entra"
+    ],
+    "enabled": true,
+    "interval": "1m",
+    "from": "now-30m",
+    "risk_score": 73,
+    "severity": "high",
+    "actions": [],
+    "tags": [
+      "attack.credential-access",
+      "attack.t1528",
+      "lab-library"
+    ]
+  },
+  {
+    "rule_id": "8a7d441b-870b-4fce-bac4-000000000005",
+    "name": "Entra Directory Role Member Added",
+    "description": "Successful entra directory role member added; behavioral signal, not proof of malicious intent. Raw provider field contract; synthetic tests only.",
+    "type": "query",
+    "language": "lucene",
+    "query": "category:RoleManagement AND activityDisplayName:\"Add member to role\" AND loggedByService:\"Core Directory\" AND result:success",
+    "index": [
+      "logs-cloud-response-lab-library-entra"
+    ],
+    "enabled": true,
+    "interval": "1m",
+    "from": "now-30m",
+    "risk_score": 73,
+    "severity": "high",
+    "actions": [],
+    "tags": [
+      "attack.privilege-escalation",
+      "attack.t1098.003",
+      "lab-library"
+    ]
+  },
+  {
+    "rule_id": "8a7d441b-870b-4fce-bac4-00000000000a",
+    "name": "Entra New User Account Created",
+    "description": "Successful creation of a new user in the directory. Combine with a role assignment to spot a new administrator account; on its own it is a low-fidelity signal.",
+    "type": "query",
+    "language": "lucene",
+    "query": "category:UserManagement AND activityDisplayName:\"Add user\" AND loggedByService:\"Core Directory\" AND result:success",
+    "index": [
+      "logs-cloud-response-lab-library-entra"
+    ],
+    "enabled": true,
+    "interval": "1m",
+    "from": "now-30m",
+    "risk_score": 47,
+    "severity": "medium",
+    "actions": [],
+    "tags": [
+      "attack.persistence",
+      "attack.t1136.003",
+      "lab-library"
+    ]
+  }
+]

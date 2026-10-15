@@ -1,0 +1,45 @@
+{
+  "positive": [
+    {
+      "name": "unlikelyTravel risk event",
+      "event": {
+        "id": "00000000-0000-4000-8000-000000000128",
+        "createdDateTime": "2026-10-14T19:32:04Z",
+        "userPrincipalName": "operator@example.invalid",
+        "ipAddress": "203.0.113.20",
+        "status": {
+          "errorCode": "0"
+        },
+        "riskEventTypes_v2": "unlikelyTravel"
+      }
+    }
+  ],
+  "negative": [
+    {
+      "name": "no risk",
+      "event": {
+        "id": "00000000-0000-4000-8000-000000000130",
+        "createdDateTime": "2026-10-14T19:32:04Z",
+        "userPrincipalName": "operator@example.invalid",
+        "ipAddress": "203.0.113.20",
+        "status": {
+          "errorCode": "0"
+        },
+        "riskEventTypes_v2": "none"
+      }
+    },
+    {
+      "name": "other risk type",
+      "event": {
+        "id": "00000000-0000-4000-8000-000000000132",
+        "createdDateTime": "2026-10-14T19:32:04Z",
+        "userPrincipalName": "operator@example.invalid",
+        "ipAddress": "203.0.113.20",
+        "status": {
+          "errorCode": "0"
+        },
+        "riskEventTypes_v2": "anonymizedIPAddress"
+      }
+    }
+  ]
+}

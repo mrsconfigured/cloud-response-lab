@@ -1,0 +1,6 @@
+**
+!response/
+!response/v1/
+!response/v1/server.py
+!response/v1/policy.py
+!response/v1/Dockerfile

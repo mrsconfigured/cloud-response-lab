@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "rule_defaults": {
+    "interval": "1m",
+    "from": "now-30m"
+  },
+  "severity_map": {
+    "informational": "low",
+    "low": "low",
+    "medium": "medium",
+    "high": "high",
+    "critical": "critical"
+  },
+  "risk_score_map": {
+    "low": 21,
+    "medium": 47,
+    "high": 73,
+    "critical": 99
+  },
+  "indices": {
+    "audit": "lab-response-audit",
+    "state": "lab-console-state"
+  },
+  "channels": [
+    "control",
+    "metrics",
+    "alerts",
+    "detection-ci",
+    "response",
+    "playbook-uat",
+    "lab-shared",
+    "coverage",
+    "learning-log"
+  ],
+  "embed_colors": {
+    "high": 15158332,
+    "critical": 10038562,
+    "medium": 15844367,
+    "low": 9807270
+  },
+  "deploy": {
+    "legacy_rule_ids": [
+      "cloud-response-lab-v1-admin-policy-attach"
+    ],
+    "note": "legacy_rule_ids are disabled v1 prototype rules that Kibana may still hold; anything else not in the repo is reported as drift."
+  }
+}
