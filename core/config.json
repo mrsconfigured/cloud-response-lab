@@ -29,7 +29,8 @@
     "response",
     "playbook-uat",
     "lab-shared",
-    "coverage"
+    "coverage",
+    "learning-log"
   ],
   "embed_colors": {
     "high": 15158332,

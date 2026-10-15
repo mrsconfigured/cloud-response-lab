@@ -12,7 +12,7 @@ from core.console import alerts as al
 from core.console import cipoll, coverage as cov, enrich as en, hunt as hu, metrics as me, outbox as ob, plain as pl, service as sv, status as stt
 from core.console.queries import rel
 from core.console import audit as au
-from core.console import paths
+from core.console import learncli, paths
 from core.console.es import Http, load_env
 from core.console.shuffle import ShuffleExecutor
 from core.console.store import now_iso
@@ -222,9 +222,12 @@ def main(argv=None):
     s = sub.add_parser('deploy-rules'); s.add_argument('--apply', action='store_true'); s.add_argument('--alert', action='store_true')
     sub.add_parser('playbooks-deploy')
     s = sub.add_parser('ingest-record'); s.add_argument('--source', required=True); s.add_argument('--docs', type=int, default=0); s.add_argument('--errors', type=int, default=0)
+    learn = learncli.register(sub)
     a = p.parse_args(argv)
     if a.cmd == 'init':
         return cmd_init(a)
+    if a.cmd in learn:
+        return learn[a.cmd](a)
     ctx = sv.Ctx()
     fn = {'alerts-poll': cmd_alerts_poll, 'outbox-next': cmd_outbox_next, 'outbox-ack': cmd_outbox_ack, 'outbox-fail': cmd_outbox_fail, 'action': cmd_action,
           'approval-confirm': cmd_confirm, 'approval-cancel': cmd_cancel, 'verdict': cmd_verdict, 'details': cmd_details, 'enrich': cmd_enrich, 'hunt': cmd_hunt, 'hunt-stub': cmd_hunt_stub,

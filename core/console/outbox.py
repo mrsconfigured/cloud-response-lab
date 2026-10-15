@@ -22,6 +22,9 @@ def next_batch(store, limit=5, now=None):
     for doc in store.list('outbox', limit=500):
         if len(out) >= limit:
             break
+        pl = doc.get('payload') or {}
+        if pl.get('kind') == 'card' and pl.get('message_id'):
+            continue   # editing and pinning only work from inside the Discord channel's own session; see learncli.pending_cards
         st = doc.get('status')
         if st == 'pending' or (st == 'posting' and doc.get('lease_until', '') < now.strftime('%Y-%m-%dT%H:%M:%SZ')):
             lease = (now + dt.timedelta(seconds=LEASE_SECONDS)).strftime('%Y-%m-%dT%H:%M:%SZ')

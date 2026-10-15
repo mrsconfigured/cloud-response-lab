@@ -1,0 +1,176 @@
+{
+ "version": 1,
+ "entries": [
+  {
+   "id": "eaeb00c",
+   "command": "git status",
+   "topic": "git",
+   "gloss": "see what changed",
+   "what": "Shows which files you have changed, which are ready to be saved (staged), and which files git is not tracking yet.",
+   "when": "Before you add or commit, and any time you want to check where you are.",
+   "added_by": "assistant",
+   "added_at": "2026-10-15T04:15:05Z"
+  },
+  {
+   "id": "e8250fb",
+   "command": "git switch -c my-change",
+   "topic": "git",
+   "gloss": "start a new branch",
+   "what": "Creates a new branch called my-change and moves you onto it, so your work stays separate from the main version.",
+   "when": "At the start of any new piece of work, before you edit files. Pick a short name that says what the change is.",
+   "added_by": "assistant",
+   "added_at": "2026-10-15T04:15:06Z"
+  },
+  {
+   "id": "ecf7375",
+   "command": "git add .",
+   "topic": "git",
+   "gloss": "stage everything changed",
+   "what": "Marks every changed file to be included in your next commit. The dot means \"everything in this folder\".",
+   "when": "After git status shows only the changes you expect. To pick one file instead, use git add followed by the file name.",
+   "added_by": "assistant",
+   "added_at": "2026-10-15T04:15:07Z"
+  },
+  {
+   "id": "e25fbca",
+   "command": "git commit -m \"Explain the change\"",
+   "topic": "git",
+   "gloss": "save a snapshot",
+   "what": "Saves the staged changes as one snapshot in your local history, with a short message saying what and why.",
+   "when": "When a small, working piece is done. Several small commits are easier to review than one huge one.",
+   "added_by": "assistant",
+   "added_at": "2026-10-15T04:15:08Z"
+  },
+  {
+   "id": "e1f1aed",
+   "command": "git push -u origin my-change",
+   "topic": "git",
+   "gloss": "upload your branch",
+   "what": "Sends your branch to GitHub. The -u part remembers the link, so next time plain git push is enough.",
+   "when": "The first time you push a new branch, so it shows up on GitHub and can become a pull request.",
+   "added_by": "assistant",
+   "added_at": "2026-10-15T04:15:09Z"
+  },
+  {
+   "id": "e423c4e",
+   "command": "git pull",
+   "topic": "git",
+   "gloss": "get others’ changes",
+   "what": "Downloads new commits from GitHub and merges them into the branch you are on.",
+   "when": "Before you start work for the day, and whenever someone says they pushed something you need.",
+   "added_by": "assistant",
+   "added_at": "2026-10-15T04:15:10Z"
+  },
+  {
+   "id": "ebec1ab",
+   "command": "git log --oneline -5",
+   "topic": "git",
+   "gloss": "recent history",
+   "what": "Lists the last five commits, one line each, newest first.",
+   "when": "To remember what you did last, or to find the commit someone is asking about.",
+   "added_by": "assistant",
+   "added_at": "2026-10-15T04:15:11Z"
+  },
+  {
+   "id": "e4bfcda",
+   "command": "python3 -m venv .venv",
+   "topic": "python",
+   "gloss": "make a private toolbox",
+   "what": "Creates a folder called .venv holding its own copy of Python and its own packages, so this project’s installs cannot break other projects.",
+   "when": "Once per project, the first time you set it up.",
+   "added_by": "assistant",
+   "added_at": "2026-10-15T04:15:12Z"
+  },
+  {
+   "id": "eac7dd0",
+   "command": "source .venv/bin/activate",
+   "topic": "python",
+   "gloss": "switch the toolbox on",
+   "what": "Makes your terminal use the Python and packages inside .venv. Your prompt shows (.venv) while it is on. Type deactivate to switch it off.",
+   "when": "Every time you open a new terminal to work on the project, before running its code or tests.",
+   "added_by": "assistant",
+   "added_at": "2026-10-15T04:15:13Z"
+  },
+  {
+   "id": "ecdb086",
+   "command": "pip install -r requirements.txt",
+   "topic": "python",
+   "gloss": "install what the project needs",
+   "what": "Reads the project’s list of required packages and installs them into the active toolbox.",
+   "when": "Right after activating a fresh .venv, and again whenever requirements.txt changes.",
+   "added_by": "assistant",
+   "added_at": "2026-10-15T04:15:14Z"
+  },
+  {
+   "id": "eb89406",
+   "command": "python3 -m pytest -q",
+   "topic": "pytest",
+   "gloss": "run all the tests",
+   "what": "Runs every automated test in the project and prints a short summary. -q means quiet: fewer lines, same result.",
+   "when": "Before you commit and before you open a pull request, to prove you did not break anything.",
+   "added_by": "assistant",
+   "added_at": "2026-10-15T04:15:15Z"
+  },
+  {
+   "id": "e673a2e",
+   "command": "python3 -m pytest -k lookback -x",
+   "topic": "pytest",
+   "gloss": "run some tests, stop at the first failure",
+   "what": "-k picks only tests whose name contains the word you give (here \"lookback\"). -x stops at the first failing test so you can fix it before going on.",
+   "when": "When one thing is failing and you want a fast loop on just that test.",
+   "added_by": "assistant",
+   "added_at": "2026-10-15T04:15:16Z"
+  },
+  {
+   "id": "e665a05",
+   "command": "Open a pull request on GitHub (Compare & pull request)",
+   "topic": "pull request",
+   "gloss": "ask for your branch to be reviewed",
+   "what": "A pull request asks the team to look at your branch and, once approved, merge it into main. GitHub shows the changes, the checks and the conversation in one place.",
+   "when": "After you have pushed your branch and the tests pass. Never merge your own work without the owner’s say-so.",
+   "added_by": "assistant",
+   "added_at": "2026-10-15T04:15:17Z"
+  },
+  {
+   "id": "e020cf1",
+   "command": "git diff main...HEAD --stat",
+   "topic": "pull request",
+   "gloss": "preview what you will propose",
+   "what": "Lists the files your branch changed compared with main, with a count of added and removed lines.",
+   "when": "Just before opening a pull request, to check you are not sending anything you did not mean to.",
+   "added_by": "assistant",
+   "added_at": "2026-10-15T04:15:18Z"
+  },
+  {
+   "id": "e950b38",
+   "command": "tailscale status",
+   "topic": "tailscale",
+   "gloss": "who is on the private network",
+   "what": "Lists the devices on our private network (the tailnet) and whether each is online.",
+   "when": "Before opening the Kibana or Shuffle links. If you are not connected, those pages will not load.",
+   "added_by": "assistant",
+   "added_at": "2026-10-15T04:15:19Z"
+  },
+  {
+   "id": "e6a1da9",
+   "command": "tailscale ip -4",
+   "topic": "tailscale",
+   "gloss": "your private address",
+   "what": "Prints this device’s private tailnet address.",
+   "when": "When someone needs to reach your machine over the tailnet. Keep the address out of chat and public repos.",
+   "added_by": "assistant",
+   "added_at": "2026-10-15T04:15:20Z"
+  },
+  {
+   "id": "e897338",
+   "command": "git diff",
+   "topic": "git",
+   "gloss": "see exactly what changed",
+   "what": "Shows the lines you added and removed in files that are not staged yet. Plus means added, minus means removed.",
+   "when": "After editing and before git add, to review your own work. Use git diff --staged to review what is about to be committed.",
+   "added_by": "owner",
+   "added_at": "2026-10-15T04:25:24Z",
+   "goal": "Learning how to check my edits before committing"
+  }
+ ]
+}
