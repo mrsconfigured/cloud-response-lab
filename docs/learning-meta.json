@@ -1,0 +1,58 @@
+{
+ "eaeb00c": {
+  "gloss": "see what changed"
+ },
+ "e8250fb": {
+  "gloss": "start a new branch"
+ },
+ "ecf7375": {
+  "gloss": "stage everything changed"
+ },
+ "e25fbca": {
+  "gloss": "save a snapshot"
+ },
+ "e1f1aed": {
+  "gloss": "upload your branch"
+ },
+ "e423c4e": {
+  "gloss": "get others’ changes"
+ },
+ "ebec1ab": {
+  "gloss": "recent history"
+ },
+ "e4bfcda": {
+  "gloss": "make a private toolbox"
+ },
+ "eac7dd0": {
+  "gloss": "switch the toolbox on"
+ },
+ "ecdb086": {
+  "gloss": "install what the project needs"
+ },
+ "eb89406": {
+  "gloss": "run all the tests"
+ },
+ "e673a2e": {
+  "gloss": "run selected tests, stop early"
+ },
+ "e665a05": {
+  "gloss": "ask for a review"
+ },
+ "e020cf1": {
+  "gloss": "preview what you will propose"
+ },
+ "e950b38": {
+  "gloss": "who's on the network"
+ },
+ "e6a1da9": {
+  "gloss": "your private address"
+ },
+ "e897338": {
+  "gloss": "see exactly what changed",
+  "goal": "Learning how to check my edits before committing"
+ },
+ "ee87183": {
+  "gloss": "see branches and upstreams",
+  "goal": "Learning to check where my branch stands"
+ }
+}

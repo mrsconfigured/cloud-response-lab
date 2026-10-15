@@ -1,10 +1,10 @@
 # Learning log
 
-Commands and steps we have learned, each with what it does and when to use it. 17 entries across 5 topics.
+Commands and steps we have learned, each with what it does and when to use it. 18 entries across 5 topics.
 
-> Generated from learning-log.json. Add an entry in Discord (#learning-log) or with the console and this file regenerates; do not edit it by hand.
+> Generated from learning-log.json. The searchable web page is the main reference; add entries from Discord (#learning-log) or the console and this file regenerates. Do not edit it by hand.
 
-**Topics:** [Git](#git) (8) · [Python](#python) (3) · [Pytest](#pytest) (2) · [Pull request](#pull-request) (2) · [Tailscale](#tailscale) (2)
+**Topics:** [Git](#git) (9) · [Python](#python) (3) · [Pytest](#pytest) (2) · [Pull request](#pull-request) (2) · [Tailscale](#tailscale) (2)
 
 ## Git
 
@@ -69,6 +69,14 @@ Commands and steps we have learned, each with what it does and when to use it. 1
 **What it does:** Shows the lines you added and removed in files that are not staged yet. Plus means added, minus means removed.
 
 **When to use it:** After editing and before git add, to review your own work. Use git diff --staged to review what is about to be committed.
+
+<sub>Added by owner on 2026-10-15</sub>
+
+### `git branch -vv`
+
+**What it does:** Lists your local branches with the latest commit on each, and shows which remote branch each one follows.
+
+**When to use it:** When you are not sure which branch you are on, or whether it is ahead of or behind GitHub.
 
 <sub>Added by owner on 2026-10-15</sub>
 
